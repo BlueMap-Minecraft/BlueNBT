@@ -260,9 +260,14 @@ public class NBTReader implements Closeable {
         } while (out > 0);
     }
 
-    public @Nullable String name() throws IOException {
+    public String name() throws IOException {
         peek();
-        return nameStack[stackPosition];
+        String name = nameStack[stackPosition];
+
+        if (name == null)
+            throw new IllegalStateException("No name available! (In a LIST or at the END of a COMPOUND)");
+
+        return name;
     }
 
     public int remainingListItems() {
