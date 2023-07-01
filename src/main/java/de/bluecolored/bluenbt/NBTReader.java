@@ -25,7 +25,6 @@
 package de.bluecolored.bluenbt;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.util.Arrays;
@@ -282,8 +281,23 @@ public class NBTReader implements Closeable {
         return stackPosition > 0 && stack[stackPosition - 1] == TagType.LIST;
     }
 
-    public String path() {
-        return "<?>"; // TODO
+    public String path() throws IOException {
+        peek();
+        StringBuilder sb = new StringBuilder();
+
+        // start with 1 since the 0th element is always the root-compound
+        for(int i = 1; i <= stackPosition; i++) {
+            if (i > 1) {
+                if (stack[i-1] == TagType.LIST) {
+                    sb.append('[').append(listStack[i]).append(']');
+                } else {
+                    sb.append('.').append(nameStack[i]);
+                }
+            } else {
+                sb.append(nameStack[i]);
+            }
+        }
+        return sb.toString();
     }
 
     private void next() {
