@@ -51,13 +51,15 @@ repositories {
 }
 
 dependencies {
-    compileOnly ("org.jetbrains:annotations:23.0.0")
+    compileOnly ("org.jetbrains:annotations:24.0.1")
     compileOnly ("org.projectlombok:lombok:1.18.28")
+
+    api ("com.google.code.gson:gson:2.8.0")
 
     annotationProcessor ("org.projectlombok:lombok:1.18.28")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.2")
     testCompileOnly ("org.projectlombok:lombok:1.18.28")
     testAnnotationProcessor ("org.projectlombok:lombok:1.18.28")
 }

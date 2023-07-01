@@ -1,22 +1,28 @@
 package de.bluecolored.bluenbt;
 
-import de.bluecolored.bluenbt.adapter.DefaultAdapterFactory;
-import de.bluecolored.bluenbt.adapter.PrimitiveAdapterFactory;
+import com.google.gson.InstanceCreator;
+import com.google.gson.internal.ConstructorConstructor;
+import com.google.gson.reflect.TypeToken;
+import de.bluecolored.bluenbt.adapter.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Type;
 import java.util.*;
-import java.util.function.Function;
 
 public class BlueNBT {
 
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
-    private final Map<Class<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
+    private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
+    private final Map<Type, InstanceCreator<?>> instanceCreators = new HashMap<>();
+
+    @Getter
+    private final ConstructorConstructor constructorConstructor = new ConstructorConstructor(instanceCreators);
 
     @Getter @Setter
-    private Function<String, String> fieldNameTransformer = s -> {
+    private FieldNameTransformer fieldNameTransformer = s -> {
         if (s.isEmpty()) return s;
         char first = s.charAt(0);
         if (Character.isUpperCase(first))
@@ -25,49 +31,74 @@ public class BlueNBT {
     };
 
     public BlueNBT() {
+        register(ArrayAdapterFactory.INSTANCE);
         register(PrimitiveAdapterFactory.INSTANCE);
+        register(CollectionAdapterFactory.INSTANCE);
+        register(MapAdapterFactory.INSTANCE);
     }
 
     public void register(TypeDeserializerFactory typeDeserializerFactory) {
         deserializerFactories.add(typeDeserializerFactory);
     }
 
-    public <T> void register(Class<T> type, TypeDeserializer<T> typeDeserializer) {
+    public <T> void register(TypeToken<T> type, TypeDeserializer<T> typeDeserializer) {
         deserializerFactories.add(new TypeDeserializerFactory() {
             @Override
-            public <U> Optional<TypeDeserializer<?>> create(Class<U> createType) {
+            @SuppressWarnings("unchecked")
+            public <U> Optional<TypeDeserializer<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
                 if (createType.equals(type))
-                    return Optional.of(typeDeserializer);
+                    return Optional.of((TypeDeserializer<U>) typeDeserializer);
                 return Optional.empty();
             }
         });
     }
 
-    @SuppressWarnings("unchecked")
-    public <T> TypeDeserializer<T> getTypeDeserializer(Class<T> type) {
+    public <T> void register(Type type, InstanceCreator<T> instanceCreator) {
+        this.instanceCreators.put(type, instanceCreator);
+    }
+
+    public <T> TypeDeserializer<T> getTypeDeserializer(TypeToken<T> type) {
+        @SuppressWarnings("unchecked")
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
 
         if (deserializer == null) {
             for (int i = deserializerFactories.size() - 1; i >= 0; i--) {
                 TypeDeserializerFactory factory = deserializerFactories.get(i);
-                deserializer = (TypeDeserializer<T>) factory.create(type).orElse(null);
+                deserializer = factory.create(type, this).orElse(null);
                 if (deserializer != null) break;
             }
 
             if (deserializer == null)
-                deserializer = DefaultAdapterFactory.INSTANCE.createFor(type);
+                deserializer = DefaultAdapterFactory.INSTANCE.createFor(type, this);
+
             typeDeserializerMap.put(type, deserializer);
         }
 
         return deserializer;
     }
 
-    public <T> T read(InputStream in, Class<T> type) throws IOException {
+    public <T> T read(InputStream in, TypeToken<T> type) throws IOException {
         return read(new NBTReader(in), type);
     }
 
+    public <T> T read(NBTReader in, TypeToken<T> type) throws IOException {
+        return getTypeDeserializer(type).read(in);
+    }
+
+    public <T> T read(InputStream in, Class<T> type) throws IOException {
+        return read(in, TypeToken.get(type));
+    }
+
     public <T> T read(NBTReader in, Class<T> type) throws IOException {
-        return getTypeDeserializer(type).read(in, this);
+        return read(in, TypeToken.get(type));
+    }
+
+    public Object read(InputStream in, Type type) throws IOException {
+        return read(in, TypeToken.get(type));
+    }
+
+    public Object read(NBTReader in, Type type) throws IOException {
+        return read(in, TypeToken.get(type));
     }
 
 }

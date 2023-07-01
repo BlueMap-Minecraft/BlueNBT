@@ -102,6 +102,10 @@ public class NBTReader implements Closeable {
         next();
     }
 
+    public boolean hasNext() throws IOException {
+        return peek() != TagType.END;
+    }
+
     public byte nextByte() throws IOException {
         checkState(TagType.BYTE);
         next();
@@ -152,6 +156,16 @@ public class NBTReader implements Closeable {
         return data;
     }
 
+    public byte[] nextByteArray(byte[] buffer) throws IOException {
+        checkState(TagType.BYTE_ARRAY);
+        next();
+        int length = in.readInt();
+        if (buffer.length != length)
+            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
+        in.readFully(buffer);
+        return buffer;
+    }
+
     public int[] nextIntArray() throws IOException {
         checkState(TagType.INT_ARRAY);
         next();
@@ -161,6 +175,17 @@ public class NBTReader implements Closeable {
         return data;
     }
 
+    public int[] nextIntArray(int[] buffer) throws IOException {
+        checkState(TagType.INT_ARRAY);
+        next();
+        int length = in.readInt();
+        if (buffer.length != length)
+            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
+        for (int i = 0; i < buffer.length; i++)
+            buffer[i] = in.readInt();
+        return buffer;
+    }
+
     public long[] nextLongArray() throws IOException {
         checkState(TagType.LONG_ARRAY);
         next();
@@ -168,6 +193,17 @@ public class NBTReader implements Closeable {
         for (int i = 0; i < data.length; i++)
             data[i] = in.readLong();
         return data;
+    }
+
+    public long[] nextLongArray(long[] buffer) throws IOException {
+        checkState(TagType.INT_ARRAY);
+        next();
+        int length = in.readInt();
+        if (buffer.length != length)
+            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
+        for (int i = 0; i < buffer.length; i++)
+            buffer[i] = in.readLong();
+        return buffer;
     }
 
     /**

@@ -38,7 +38,7 @@ public class NBTReaderTest {
 
     @Test
     public void testNbtReader() throws IOException {
-        InputStream in = NBTReaderTest.class.getResourceAsStream("/testdata.dat");
+        InputStream in = NBTReaderTest.class.getResourceAsStream("/level.dat");
         assert in != null;
 
         try (NBTReader reader = new NBTReader(new GZIPInputStream(in))) {

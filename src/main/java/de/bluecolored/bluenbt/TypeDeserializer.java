@@ -5,6 +5,6 @@ import java.io.IOException;
 @FunctionalInterface
 public interface TypeDeserializer<T> {
 
-    T read(NBTReader reader, BlueNBT blueNBT) throws IOException;
+    T read(NBTReader reader) throws IOException;
 
 }

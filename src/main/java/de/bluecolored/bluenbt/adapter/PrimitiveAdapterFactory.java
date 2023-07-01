@@ -1,105 +1,86 @@
 package de.bluecolored.bluenbt.adapter;
 
+import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public class PrimitiveAdapterFactory implements TypeDeserializerFactory {
 
     public static final PrimitiveAdapterFactory INSTANCE = new PrimitiveAdapterFactory();
 
+    private static final Map<Type, TypeDeserializer<?>> TYPE_DESERIALIZER_MAP = new HashMap<>();
+    static {
+        registerTypeDeserializer(boolean.class, Boolean.class, PrimitiveAdapterFactory::readBool);
+        registerTypeDeserializer(byte.class, Byte.class, PrimitiveAdapterFactory::readByte);
+        registerTypeDeserializer(short.class, Short.class, PrimitiveAdapterFactory::readShort);
+        registerTypeDeserializer(char.class, Character.class, PrimitiveAdapterFactory::readChar);
+        registerTypeDeserializer(int.class, Integer.class, PrimitiveAdapterFactory::readInt);
+        registerTypeDeserializer(long.class, Long.class, PrimitiveAdapterFactory::readLong);
+        registerTypeDeserializer(float.class, Float.class, PrimitiveAdapterFactory::readFloat);
+        registerTypeDeserializer(double.class, Double.class, PrimitiveAdapterFactory::readDouble);
+        registerTypeDeserializer(String.class, null, PrimitiveAdapterFactory::readString);
+    }
+
+    private static void registerTypeDeserializer(Type primitiveType, Type boxedType, TypeDeserializer<?> typeDeserializer) {
+        TYPE_DESERIALIZER_MAP.put(primitiveType, typeDeserializer);
+        if (boxedType != null) TYPE_DESERIALIZER_MAP.put(boxedType, typeDeserializer);
+    }
+
     @Override
-    public <T> Optional<TypeDeserializer<?>> create(Class<T> type) {
+    @SuppressWarnings("unchecked")
+    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
+        TypeDeserializer<?> typeDeserializer = TYPE_DESERIALIZER_MAP.get(typeToken.getRawType());
 
-        if (type.equals(boolean.class) || type.equals(Boolean.class))
-            return Optional.of((TypeDeserializer<Boolean>) this::readBool);
-
-        if (type.equals(byte.class) || type.equals(Byte.class))
-            return Optional.of((TypeDeserializer<Byte>) this::readByte);
-
-        if (type.equals(short.class) || type.equals(Short.class))
-            return Optional.of((TypeDeserializer<Short>) this::readShort);
-
-        if (type.equals(char.class) || type.equals(Character.class))
-            return Optional.of((TypeDeserializer<Character>) this::readChar);
-
-        if (type.equals(int.class) || type.equals(Integer.class))
-            return Optional.of((TypeDeserializer<Integer>) this::readInt);
-
-        if (type.equals(long.class) || type.equals(Long.class))
-            return Optional.of((TypeDeserializer<Long>) this::readLong);
-
-        if (type.equals(float.class) || type.equals(Float.class))
-            return Optional.of((TypeDeserializer<Float>) this::readFloat);
-
-        if (type.equals(double.class) || type.equals(Double.class))
-            return Optional.of((TypeDeserializer<Double>) this::readDouble);
-
-        if (type.equals(byte[].class))
-            return Optional.of(this::readByteArray);
-
-        if (type.equals(int[].class))
-            return Optional.of(this::readIntArray);
-
-        if (type.equals(long[].class))
-            return Optional.of(this::readLongArray);
-
-        if (type.equals(String.class))
-            return Optional.of(this::readString);
+        if (typeDeserializer != null)
+            return Optional.of((TypeDeserializer<T>) typeDeserializer);
 
         return Optional.empty();
     }
 
-    private Boolean readBool(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).byteValue() > 0;
+    private static Boolean readBool(NBTReader reader) throws IOException {
+        if (reader.peek() == TagType.STRING)
+            return Boolean.valueOf(reader.nextString());
+        return readNumber(reader).byteValue() > 0;
     }
 
-    private Byte readByte(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).byteValue();
+    private static Byte readByte(NBTReader reader) throws IOException {
+        return readNumber(reader).byteValue();
     }
 
-    private Short readShort(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).shortValue();
+    private static Short readShort(NBTReader reader) throws IOException {
+        return readNumber(reader).shortValue();
     }
 
-    private Character readChar(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return (char) readNumber(reader, blueNBT).shortValue();
+    private static Character readChar(NBTReader reader) throws IOException {
+        return (char) readNumber(reader).shortValue();
     }
 
-    private Integer readInt(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).intValue();
+    private static Integer readInt(NBTReader reader) throws IOException {
+        return readNumber(reader).intValue();
     }
 
-    private Long readLong(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).longValue();
+    private static Long readLong(NBTReader reader) throws IOException {
+        return readNumber(reader).longValue();
     }
 
-    private Float readFloat(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).floatValue();
+    private static Float readFloat(NBTReader reader) throws IOException {
+        return readNumber(reader).floatValue();
     }
 
-    private Double readDouble(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return readNumber(reader, blueNBT).doubleValue();
+    private static Double readDouble(NBTReader reader) throws IOException {
+        return readNumber(reader).doubleValue();
     }
 
-    private byte[] readByteArray(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return reader.nextByteArray();
-    }
-
-    private int[] readIntArray(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return reader.nextIntArray();
-    }
-
-    private long[] readLongArray(NBTReader reader, BlueNBT blueNBT) throws IOException {
-        return reader.nextLongArray();
-    }
-
-    private String readString(NBTReader reader, BlueNBT blueNBT) throws IOException {
+    private static String readString(NBTReader reader) throws IOException {
         return reader.nextString();
     }
 
-    private Number readNumber(NBTReader reader, BlueNBT blueNBT) throws IOException {
+    private static Number readNumber(NBTReader reader) throws IOException {
         TagType type = reader.peek();
         switch (type) {
             case BYTE: return reader.nextByte();

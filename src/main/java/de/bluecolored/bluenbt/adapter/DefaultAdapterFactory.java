@@ -1,11 +1,12 @@
 package de.bluecolored.bluenbt.adapter;
 
+import com.google.gson.internal.ObjectConstructor;
+import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
+import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,47 +14,37 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
     public static final DefaultAdapterFactory INSTANCE = new DefaultAdapterFactory();
-    private static final Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> TYPE_DESERIALIZER_CACHE =
-            new ConcurrentHashMap<>();
 
     @Override
-    public <T> Optional<TypeDeserializer<?>> create(Class<T> type) {
-        return Optional.of(createFor(type));
+    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT) {
+        return Optional.of(createFor(type, blueNBT));
     }
 
-    public <T> TypeDeserializer<T> createFor(Class<T> type) {
-        return new DefaultAdapter<>(type);
+    public <T> TypeDeserializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
+        return new DefaultAdapter<>(type, blueNBT.getConstructorConstructor().get(type), blueNBT);
     }
 
+    @RequiredArgsConstructor
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {
 
-        private final Class<T> type;
-        private final Constructor<T> noArgConstructor;
+        private final Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
+                new ConcurrentHashMap<>();
 
-        DefaultAdapter(Class<T> type) {
-            this.type = type;
-
-            Constructor<T> constructor = null;
-            try {
-                constructor = type.getDeclaredConstructor();
-                constructor.setAccessible(true);
-            } catch (Exception ignore) {}
-            this.noArgConstructor = constructor;
-        }
+        private final TypeToken<T> type;
+        private final ObjectConstructor<T> constructor;
+        private final BlueNBT blueNBT;
 
         @Override
-        @SuppressWarnings("unchecked")
-        public T read(NBTReader reader, BlueNBT blueNBT) throws IOException {
-            if (noArgConstructor == null) throw new IOException("Failed to deserialize type '" + type + "': No zero arg constructor!");
+        public T read(NBTReader reader) throws IOException {
 
             try {
-                T object = this.noArgConstructor.newInstance();
+                T object = constructor.construct();
                 reader.beginCompound();
 
                 while (reader.peek() != TagType.END) {
                     String name = blueNBT.getFieldNameTransformer().apply(reader.name());
                     try {
-                        Field field = this.type.getDeclaredField(name);
+                        Field field = type.getRawType().getDeclaredField(name);
                         field.setAccessible(true);
                         Class<?> fieldType = field.getType();
 
@@ -63,16 +54,17 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                         }
 
                         if (deserializerType != null) {
-                            TypeDeserializer<T> deserializer = (TypeDeserializer<T>) TYPE_DESERIALIZER_CACHE.computeIfAbsent(deserializerType.value(), t -> {
+                            @SuppressWarnings("unchecked")
+                            TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
                                 try {
                                     return t.getDeclaredConstructor().newInstance();
                                 } catch (Exception ex) {
                                     throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
                                 }
                             });
-                            field.set(object, deserializer.read(reader, blueNBT));
+                            field.set(object, deserializer.read(reader));
                         } else {
-                            field.set(object, blueNBT.read(reader, fieldType));
+                            field.set(object, blueNBT.read(reader, TypeToken.get(field.getGenericType())));
                         }
                     } catch (NoSuchFieldException ignore) {
                         reader.skip();
@@ -81,7 +73,7 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
                 reader.endCompound();
                 return object;
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException ex) {
+            } catch (IllegalAccessException ex) {
                 throw new IOException("Failed to create instance of type '" + type + "'!", ex);
             }
         }
