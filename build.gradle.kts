@@ -91,6 +91,13 @@ tasks.withType(JavaCompile::class).configureEach {
     }
 }
 
+tasks.withType(Javadoc::class) {
+    options {
+        this as StandardJavadocDocletOptions // unsafe cast
+        addStringOption("Xdoclint:none", "-quiet")
+    }
+}
+
 tasks.withType(AbstractArchiveTask::class).configureEach {
     isReproducibleFileOrder = true
     isPreserveFileTimestamps = false

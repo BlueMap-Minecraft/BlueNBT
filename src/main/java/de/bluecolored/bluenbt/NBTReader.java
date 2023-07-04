@@ -24,8 +24,6 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.internal.$Gson$Types;
-import com.google.gson.internal.Primitives;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
