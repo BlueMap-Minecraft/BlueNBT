@@ -26,6 +26,7 @@ package de.bluecolored.bluenbt;
 
 import com.google.gson.reflect.TypeToken;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import net.querz.nbt.mca.CompressionType;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,15 +54,15 @@ public class BlueNBTTest {
         try (InputStream in = NBTReaderTest.class.getResourceAsStream("/level.dat")) {
             assert in != null;
 
-            LevelFile testData = blueNBT.read(new GZIPInputStream(in), TypeToken.get(LevelFile.class));
+            LevelFile<DataTag> testData = blueNBT.read(new GZIPInputStream(in), new TypeToken<>() {});
             DataTag data = testData.data;
 
-            assertEquals(1, data.difficulty);
-            assertFalse(data.difficultyLocked);
-            assertEquals(14590, data.rainTime);
-            assertEquals(1687182273928L, data.lastPlayed);
-            assertEquals(0.2, data.borderDamagePerBlock);
-            assertEquals("world", data.levelName);
+            assertEquals(1, data.getDifficulty());
+            assertFalse(data.isDifficultyLocked());
+            assertEquals(14590, data.getRainTime());
+            assertEquals(1687182273928L, data.getLastPlayed());
+            assertEquals(0.2, data.getBorderDamagePerBlock());
+            assertEquals("world", data.getLevelName());
         }
 
     }
@@ -147,18 +147,23 @@ public class BlueNBTTest {
     }
 
     @Data
-    private static class LevelFile {
-        private DataTag data;
+    private static class LevelFile<T> {
+        private T data;
     }
 
     @Data
-    private static class DataTag {
-        private int difficulty;
-        private boolean difficultyLocked;
-        private int rainTime;
+    @EqualsAndHashCode(callSuper = true)
+    private static class DataTag extends DataTagSuper {
         private long lastPlayed;
         private double borderDamagePerBlock;
         private String levelName;
+    }
+
+    @Data
+    private static class DataTagSuper {
+        private int difficulty;
+        private boolean difficultyLocked;
+        private int rainTime;
     }
 
 }

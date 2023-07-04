@@ -24,6 +24,7 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
+import com.google.gson.internal.$Gson$Types;
 import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
@@ -31,6 +32,7 @@ import lombok.Data;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -64,34 +66,40 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
             Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
                     new HashMap<>();
 
-            for (Field field : type.getRawType().getDeclaredFields()) {
-                field.setAccessible(true);
+            TypeToken<?> typeToken = type;
+            Class<?> raw = typeToken.getRawType();
+            while (raw != Object.class) {
+                for (Field field : raw.getDeclaredFields()) {
+                    field.setAccessible(true);
 
-                String name = field.getName();
-                NBTName nbtName = field.getAnnotation(NBTName.class);
-                if (nbtName != null) name = nbtName.value();
+                    String name = field.getName();
+                    NBTName nbtName = field.getAnnotation(NBTName.class);
+                    if (nbtName != null) name = nbtName.value();
 
-                Class<?> fieldType = field.getType();
-                TypeToken<?> fieldTypeToken = TypeToken.get(field.getGenericType());
-                NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
-                if (deserializerType == null) {
-                    deserializerType = fieldType.getAnnotation(NBTDeserializer.class);
+                    TypeToken<?> fieldType = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, field.getGenericType()));
+                    NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
+                    if (deserializerType == null) {
+                        deserializerType = fieldType.getRawType().getAnnotation(NBTDeserializer.class);
+                    }
+
+                    TypeDeserializer<?> typeDeserializer;
+                    if (deserializerType != null) {
+                        typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
+                            try {
+                                return t.getDeclaredConstructor().newInstance();
+                            } catch (Exception ex) {
+                                throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
+                            }
+                        });
+                    } else {
+                        typeDeserializer = reader -> blueNBT.read(reader, fieldType);
+                    }
+
+                    fields.put(name, new FieldInfo(field, typeDeserializer));
                 }
 
-                TypeDeserializer<?> typeDeserializer;
-                if (deserializerType != null) {
-                    typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
-                        try {
-                            return t.getDeclaredConstructor().newInstance();
-                        } catch (Exception ex) {
-                            throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
-                        }
-                    });
-                } else {
-                    typeDeserializer = reader -> blueNBT.read(reader, fieldTypeToken);
-                }
-
-                fields.put(name, new FieldInfo(field, typeDeserializer));
+                typeToken = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));
+                raw = typeToken.getRawType();
             }
         }
 
