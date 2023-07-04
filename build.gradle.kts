@@ -44,10 +44,16 @@ val javaTarget = 11
 java {
     sourceCompatibility = JavaVersion.toVersion(javaTarget)
     targetCompatibility = JavaVersion.toVersion(javaTarget)
+
+    withSourcesJar()
+    withJavadocJar()
 }
 
 repositories {
     mavenCentral()
+    maven {
+        setUrl("https://jitpack.io")
+    }
 }
 
 dependencies {
@@ -58,8 +64,9 @@ dependencies {
 
     annotationProcessor ("org.projectlombok:lombok:1.18.28")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.2")
+    testImplementation ("com.github.Querz:NBT:4.0")
+    testImplementation ("org.junit.jupiter:junit-jupiter-api:5.9.2")
+    testRuntimeOnly ("org.junit.jupiter:junit-jupiter-engine:5.9.2")
     testCompileOnly ("org.projectlombok:lombok:1.18.28")
     testAnnotationProcessor ("org.projectlombok:lombok:1.18.28")
 }

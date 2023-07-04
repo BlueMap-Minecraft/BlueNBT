@@ -22,11 +22,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package de.bluecolored.bluenbt.testutil;
+package de.bluecolored.bluenbt;
 
-@FunctionalInterface
-public interface ExceptionFunction<T, R, E extends Exception> {
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-    R accept(T t) throws E;
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD})
+public @interface NBTName {
+
+    String value();
 
 }

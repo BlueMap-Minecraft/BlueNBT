@@ -24,14 +24,19 @@
  */
 package de.bluecolored.bluenbt;
 
+import com.google.gson.internal.$Gson$Types;
+import com.google.gson.internal.Primitives;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.IntFunction;
 
 public class NBTReader implements Closeable {
-    private static final String SKIPPED_NAME = "<skipped>";
+    private static final String UNKNOWN_NAME = "<unknown>";
 
     private final DataInputStream in;
 
@@ -49,25 +54,25 @@ public class NBTReader implements Closeable {
     }
 
     public TagType peek() throws IOException {
-        return peek(false);
-    }
-
-    private TagType peek(boolean skipName) throws IOException {
         TagType peek = stack[stackPosition];
         if (peek == null) {
             peek = readTag();
             stack[stackPosition] = peek;
-
-            if (peek != TagType.END) {
-                if (skipName) {
-                    skipUTF();
-                    nameStack[stackPosition] = SKIPPED_NAME;
-                } else {
-                    nameStack[stackPosition] = in.readUTF();
-                }
-            }
         }
         return peek;
+    }
+
+    public String name() throws IOException {
+        String name = nameStack[stackPosition];
+        if (name == null) {
+            if (peek() != TagType.END) {
+                name = in.readUTF();
+            } else {
+                name = UNKNOWN_NAME;
+            }
+            nameStack[stackPosition] = name;
+        }
+        return name;
     }
 
     public void beginCompound() throws IOException {
@@ -91,6 +96,7 @@ public class NBTReader implements Closeable {
 
         stack[stackPosition] = listLength == 0 ? TagType.END : listType;
         listStack[stackPosition] = listLength;
+        nameStack[stackPosition] = UNKNOWN_NAME;
 
         return listLength;
     }
@@ -156,14 +162,14 @@ public class NBTReader implements Closeable {
         return data;
     }
 
-    public byte[] nextByteArray(byte[] buffer) throws IOException {
+    public int nextByteArray(byte[] buffer) throws IOException {
         checkState(TagType.BYTE_ARRAY);
         next();
         int length = in.readInt();
-        if (buffer.length != length)
-            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
-        in.readFully(buffer);
-        return buffer;
+        int readLength = Math.min(length, buffer.length);
+        in.readFully(buffer, 0, readLength);
+        in.skipNBytes(length - readLength);
+        return length;
     }
 
     public int[] nextIntArray() throws IOException {
@@ -175,15 +181,15 @@ public class NBTReader implements Closeable {
         return data;
     }
 
-    public int[] nextIntArray(int[] buffer) throws IOException {
+    public int nextIntArray(int[] buffer) throws IOException {
         checkState(TagType.INT_ARRAY);
         next();
         int length = in.readInt();
-        if (buffer.length != length)
-            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
-        for (int i = 0; i < buffer.length; i++)
+        int readLength = Math.min(length, buffer.length);
+        for (int i = 0; i < readLength; i++)
             buffer[i] = in.readInt();
-        return buffer;
+        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
+        return length;
     }
 
     public long[] nextLongArray() throws IOException {
@@ -195,15 +201,104 @@ public class NBTReader implements Closeable {
         return data;
     }
 
-    public long[] nextLongArray(long[] buffer) throws IOException {
-        checkState(TagType.INT_ARRAY);
+    public int nextLongArray(long[] buffer) throws IOException {
+        checkState(TagType.LONG_ARRAY);
         next();
         int length = in.readInt();
-        if (buffer.length != length)
-            throw new IllegalStateException("Expected array-length of " + buffer.length + " but got " + length + ". At: " + path());
-        for (int i = 0; i < buffer.length; i++)
+        int readLength = Math.min(length, buffer.length);
+        for (int i = 0; i < readLength; i++)
             buffer[i] = in.readLong();
-        return buffer;
+        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
+        return length;
+    }
+
+    /**
+     * Reads any type of array (BYTE_ARRAY, INT_ARRAY or LONG_ARRAY) and returns it as a byte-array.
+     */
+    public byte[] nextArrayAsByteArray() throws IOException {
+        if (peek() == TagType.BYTE_ARRAY) return nextByteArray();
+        return nextArray(byte[]::new);
+    }
+
+    /**
+     * Reads any type of array (BYTE_ARRAY, INT_ARRAY or LONG_ARRAY) and returns it as an int-array.
+     */
+    public int[] nextArrayAsIntArray() throws IOException {
+        if (peek() == TagType.INT_ARRAY) return nextIntArray();
+        return nextArray(int[]::new);
+    }
+
+    /**
+     * Reads any type of array (BYTE_ARRAY, INT_ARRAY or LONG_ARRAY) and returns it as a long-array.
+     */
+    public long[] nextArrayAsLongArray() throws IOException {
+        if (peek() == TagType.LONG_ARRAY) return nextLongArray();
+        return nextArray(long[]::new);
+    }
+
+    /**
+     * Reads any type of array (BYTE_ARRAY, INT_ARRAY or LONG_ARRAY) into the provided bufferArray.
+     * @param bufferArray The array that will be used to store the data.<br>
+     *                    If the length in the data is smaller than this buffer, the rest of the buffer will remain unchanged.<br>
+     *                    If the length in the data is greater than this buffer, the remaining data will be skipped and discarded.
+     * @return The actual size of the data -> The number of data-elements that have been read OR discarded.
+     */
+    public int nextArray(Object bufferArray) throws IOException {
+        checkState();
+        TagType type = peek();
+        int length = in.readInt();
+        switch (type) {
+            case BYTE_ARRAY: readByteArray(length, bufferArray); break;
+            case INT_ARRAY: readIntArray(length, bufferArray); break;
+            case LONG_ARRAY: readLongArray(length, bufferArray); break;
+            default: throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
+        }
+        next();
+        return length;
+    }
+
+    /**
+     * Reads any type of array (BYTE_ARRAY, INT_ARRAY or LONG_ARRAY) and returns it into the array created by the provided generator.
+     * @param generator The generator creating a new array that will be populated with the data.
+     * @return The actual size of the data -> The number of data-elements that have been read OR discarded.
+     */
+    public <A> A nextArray(IntFunction<A> generator) throws IOException {
+        checkState();
+        TagType type = peek();
+        int length = in.readInt();
+        A bufferArray = generator.apply(length);
+        switch (type) {
+            case BYTE_ARRAY: readByteArray(length, bufferArray); break;
+            case INT_ARRAY: readIntArray(length, bufferArray); break;
+            case LONG_ARRAY: readLongArray(length, bufferArray); break;
+            default: throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
+        }
+        next();
+        return bufferArray;
+    }
+
+    private void readByteArray(int length, Object bufferArray) throws IOException {
+        checkState(TagType.BYTE_ARRAY);
+        int readLength = Math.min(length, Array.getLength(bufferArray));
+        for (int i = 0; i < readLength; i++)
+            Array.setByte(bufferArray, i, in.readByte());
+        in.skipNBytes(length - readLength);
+    }
+
+    private void readIntArray(int length, Object bufferArray) throws IOException {
+        checkState(TagType.INT_ARRAY);
+        int readLength = Math.min(length, Array.getLength(bufferArray));
+        for (int i = 0; i < readLength; i++)
+            Array.setInt(bufferArray, i, in.readInt());
+        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
+    }
+
+    private void readLongArray(int length, Object bufferArray) throws IOException {
+        checkState(TagType.LONG_ARRAY);
+        int readLength = Math.min(length, Array.getLength(bufferArray));
+        for (int i = 0; i < readLength; i++)
+            Array.setLong(bufferArray, i, in.readLong());
+        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
     }
 
     /**
@@ -219,10 +314,11 @@ public class NBTReader implements Closeable {
      *            E.g. If this is 1 this will skip until the end of the current Compound or List and consume the end.
      */
     public void skip(int out) throws IOException {
-        if (peek(true) == TagType.END) throw new IllegalStateException("Can not skip END tag!");
+        if (out < 0) throw new IllegalArgumentException("'out' can not be negative!");
+        if (out == 0 && peek() == TagType.END) throw new IllegalStateException("Can not skip END tag!");
 
         do {
-            TagType type = peek(true);
+            TagType type = peek();
             switch (type) {
 
                 case END: {
@@ -238,18 +334,21 @@ public class NBTReader implements Closeable {
                 case LONG:
                 case FLOAT:
                 case DOUBLE: {
+                    checkState();
                     in.skipNBytes(type.getSize());
                     next();
                     break;
                 }
 
                 case STRING: {
+                    checkState();
                     skipUTF();
                     next();
                     break;
                 }
 
                 case BYTE_ARRAY: {
+                    checkState();
                     long length = in.readInt();
                     in.skipNBytes(TagType.BYTE.getSize() * length);
                     next();
@@ -257,6 +356,7 @@ public class NBTReader implements Closeable {
                 }
 
                 case INT_ARRAY: {
+                    checkState();
                     long length = in.readInt();
                     in.skipNBytes(TagType.INT.getSize() * length);
                     next();
@@ -264,6 +364,7 @@ public class NBTReader implements Closeable {
                 }
 
                 case LONG_ARRAY: {
+                    checkState();
                     long length = in.readInt();
                     in.skipNBytes(TagType.LONG.getSize() * length);
                     next();
@@ -295,16 +396,6 @@ public class NBTReader implements Closeable {
         } while (out > 0);
     }
 
-    public String name() throws IOException {
-        peek();
-        String name = nameStack[stackPosition];
-
-        if (name == null)
-            throw new IllegalStateException("No name available! (In a LIST or at the END of a COMPOUND)");
-
-        return name;
-    }
-
     public int remainingListItems() {
         return listStack[stackPosition];
     }
@@ -318,7 +409,7 @@ public class NBTReader implements Closeable {
     }
 
     public String path() throws IOException {
-        peek();
+        checkState();
         StringBuilder sb = new StringBuilder();
 
         // start with 1 since the 0th element is always the root-compound
@@ -380,9 +471,20 @@ public class NBTReader implements Closeable {
         in.skipNBytes(length);
     }
 
-    private void checkState(TagType expected) throws IOException {
-        if (peek() != expected)
+    private void checkState() throws IOException {
+        checkState(null);
+    }
+
+    private void checkState(@Nullable TagType expected) throws IOException {
+        TagType type = peek();
+        if (expected != null && type != expected)
             throw new IllegalStateException("Expected type " + expected + " but got " + peek() + ". At: " + path());
+
+        // skip name if it has not been read yet to make sure we are ready read the value
+        if (nameStack[stackPosition] == null) {
+            nameStack[stackPosition] = UNKNOWN_NAME;
+            if (type != TagType.END) skipUTF();
+        }
     }
 
     @Override

@@ -27,13 +27,13 @@ package de.bluecolored.bluenbt.adapter;
 import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
-import lombok.RequiredArgsConstructor;
+import lombok.Data;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
@@ -48,15 +48,53 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
         return new DefaultAdapter<>(type, blueNBT.getConstructorConstructor().get(type), blueNBT);
     }
 
-    @RequiredArgsConstructor
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {
-
-        private final Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
-                new ConcurrentHashMap<>();
 
         private final TypeToken<T> type;
         private final ObjectConstructor<T> constructor;
         private final BlueNBT blueNBT;
+
+        private final Map<String, FieldInfo> fields = new HashMap<>();
+
+        public DefaultAdapter(TypeToken<T> type, ObjectConstructor<T> constructor, BlueNBT blueNBT) {
+            this.type = type;
+            this.constructor = constructor;
+            this.blueNBT = blueNBT;
+
+            Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
+                    new HashMap<>();
+
+            for (Field field : type.getRawType().getDeclaredFields()) {
+                field.setAccessible(true);
+
+                String name = field.getName();
+                NBTName nbtName = field.getAnnotation(NBTName.class);
+                if (nbtName != null) name = nbtName.value();
+
+                Class<?> fieldType = field.getType();
+                TypeToken<?> fieldTypeToken = TypeToken.get(field.getGenericType());
+                NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
+                if (deserializerType == null) {
+                    deserializerType = fieldType.getAnnotation(NBTDeserializer.class);
+                }
+
+                TypeDeserializer<?> typeDeserializer;
+                if (deserializerType != null) {
+                    typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
+                        try {
+                            return t.getDeclaredConstructor().newInstance();
+                        } catch (Exception ex) {
+                            throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
+                        }
+                    });
+                } else {
+                    typeDeserializer = reader -> blueNBT.read(reader, fieldTypeToken);
+                }
+
+                fields.put(name, new FieldInfo(field, typeDeserializer));
+            }
+        }
+
 
         @Override
         public T read(NBTReader reader) throws IOException {
@@ -67,30 +105,10 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
                 while (reader.peek() != TagType.END) {
                     String name = blueNBT.getFieldNameTransformer().apply(reader.name());
-                    try {
-                        Field field = type.getRawType().getDeclaredField(name);
-                        field.setAccessible(true);
-                        Class<?> fieldType = field.getType();
-
-                        NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
-                        if (deserializerType == null) {
-                            deserializerType = fieldType.getAnnotation(NBTDeserializer.class);
-                        }
-
-                        if (deserializerType != null) {
-                            @SuppressWarnings("unchecked")
-                            TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
-                                try {
-                                    return t.getDeclaredConstructor().newInstance();
-                                } catch (Exception ex) {
-                                    throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
-                                }
-                            });
-                            field.set(object, deserializer.read(reader));
-                        } else {
-                            field.set(object, blueNBT.read(reader, TypeToken.get(field.getGenericType())));
-                        }
-                    } catch (NoSuchFieldException ignore) {
+                    FieldInfo fieldInfo = fields.get(name);
+                    if (fieldInfo != null) {
+                        fieldInfo.getField().set(object, fieldInfo.getTypeDeserializer().read(reader));
+                    } else {
                         reader.skip();
                     }
                 }
@@ -102,6 +120,12 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
             }
         }
 
+    }
+
+    @Data
+    private static class FieldInfo {
+        private final Field field;
+        private final TypeDeserializer<?> typeDeserializer;
     }
 
 }

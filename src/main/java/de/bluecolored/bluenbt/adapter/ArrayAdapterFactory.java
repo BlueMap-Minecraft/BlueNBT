@@ -25,7 +25,6 @@
 package de.bluecolored.bluenbt.adapter;
 
 import com.google.gson.internal.$Gson$Types;
-import com.google.gson.internal.Primitives;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +74,10 @@ public class ArrayAdapterFactory implements TypeDeserializerFactory {
 
             if (tag == TagType.LONG_ARRAY && type.equals(long.class)) {
                 return reader.nextLongArray();
+            }
+
+            if (tag == TagType.BYTE_ARRAY || tag == TagType.INT_ARRAY || tag == TagType.LONG_ARRAY) {
+                return reader.nextArray(length -> Array.newInstance(type, length));
             }
 
             int length = reader.beginList();

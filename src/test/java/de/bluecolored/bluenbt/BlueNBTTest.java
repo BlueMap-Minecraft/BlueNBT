@@ -25,15 +25,21 @@
 package de.bluecolored.bluenbt;
 
 import com.google.gson.reflect.TypeToken;
-import de.bluecolored.bluenbt.testutil.CompressionType;
 import lombok.Data;
+import net.querz.nbt.mca.CompressionType;
 import org.junit.jupiter.api.Test;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,10 +77,10 @@ public class BlueNBTTest {
             assertEquals(25, chunk.getSections().size());
 
             Section section = chunk.getSections().get(3);
-            assertEquals(section.getBlock_states().getData()[0], 1162219257593856L);
-            assertEquals(section.getBlock_states().getPalette().length, 26);
+            assertEquals(section.getBlockStates().getData()[0], 1162219257593856L);
+            assertEquals(section.getBlockStates().getPalette().length, 26);
 
-            BlockState blockState = section.getBlock_states().getPalette()[6];
+            BlockState blockState = section.getBlockStates().getPalette()[6];
             assertEquals(blockState.getProperties().size(), 7);
             assertEquals(blockState.getProperties().get("down"), "true");
             assertEquals(blockState.getProperties().get("east"), "false");
@@ -102,9 +108,7 @@ public class BlueNBTTest {
         offset *= 4096;
 
         int size = raf.readByte() * 4096;
-        if (size == 0) {
-            throw new NoSuchElementException("Chunk does not exist");
-        }
+        if (size == 0) return null;
 
         raf.seek(offset + 4); // +4 skip chunk size
 
@@ -125,7 +129,8 @@ public class BlueNBTTest {
     @Data
     private static class Section {
         private int y;
-        private BlockStates block_states = new BlockStates();
+        @NBTName("block_states")
+        private BlockStates blockStates = new BlockStates();
         private byte[] blockLight = new byte[0];
     }
 

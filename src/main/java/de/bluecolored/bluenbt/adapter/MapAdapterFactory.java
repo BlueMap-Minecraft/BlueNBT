@@ -35,10 +35,8 @@ import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class MapAdapterFactory implements TypeDeserializerFactory {
 
@@ -63,13 +61,13 @@ public class MapAdapterFactory implements TypeDeserializerFactory {
     }
 
     @RequiredArgsConstructor
-    static class MapAdapter<E> implements TypeDeserializer<Map<? super String, E>>  {
+    static class MapAdapter<E> implements TypeDeserializer<Map<String, E>>  {
 
         private final TypeDeserializer<E> typeDeserializer;
         private final ObjectConstructor<? extends Map<String, E>> constructor;
 
         @Override
-        public Map<? super String, E> read(NBTReader reader) throws IOException {
+        public Map<String, E> read(NBTReader reader) throws IOException {
             Map<String, E> map = constructor.construct();
             reader.beginCompound();
             while (reader.hasNext()) {
