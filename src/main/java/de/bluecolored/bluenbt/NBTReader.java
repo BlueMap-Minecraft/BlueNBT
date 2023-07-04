@@ -166,7 +166,7 @@ public class NBTReader implements Closeable {
         int length = in.readInt();
         int readLength = Math.min(length, buffer.length);
         in.readFully(buffer, 0, readLength);
-        in.skipNBytes(length - readLength);
+        skipNBytes(length - readLength);
         return length;
     }
 
@@ -186,7 +186,7 @@ public class NBTReader implements Closeable {
         int readLength = Math.min(length, buffer.length);
         for (int i = 0; i < readLength; i++)
             buffer[i] = in.readInt();
-        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
+        skipNBytes((long) (length - readLength) * TagType.INT.getSize());
         return length;
     }
 
@@ -206,7 +206,7 @@ public class NBTReader implements Closeable {
         int readLength = Math.min(length, buffer.length);
         for (int i = 0; i < readLength; i++)
             buffer[i] = in.readLong();
-        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
+        skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
         return length;
     }
 
@@ -280,7 +280,7 @@ public class NBTReader implements Closeable {
         int readLength = Math.min(length, Array.getLength(bufferArray));
         for (int i = 0; i < readLength; i++)
             Array.setByte(bufferArray, i, in.readByte());
-        in.skipNBytes(length - readLength);
+        skipNBytes(length - readLength);
     }
 
     private void readIntArray(int length, Object bufferArray) throws IOException {
@@ -288,7 +288,7 @@ public class NBTReader implements Closeable {
         int readLength = Math.min(length, Array.getLength(bufferArray));
         for (int i = 0; i < readLength; i++)
             Array.setInt(bufferArray, i, in.readInt());
-        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
+        skipNBytes((long) (length - readLength) * TagType.INT.getSize());
     }
 
     private void readLongArray(int length, Object bufferArray) throws IOException {
@@ -296,7 +296,7 @@ public class NBTReader implements Closeable {
         int readLength = Math.min(length, Array.getLength(bufferArray));
         for (int i = 0; i < readLength; i++)
             Array.setLong(bufferArray, i, in.readLong());
-        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
+        skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
     }
 
     /**
@@ -333,7 +333,7 @@ public class NBTReader implements Closeable {
                 case FLOAT:
                 case DOUBLE: {
                     checkState();
-                    in.skipNBytes(type.getSize());
+                    skipNBytes(type.getSize());
                     next();
                     break;
                 }
@@ -348,7 +348,7 @@ public class NBTReader implements Closeable {
                 case BYTE_ARRAY: {
                     checkState();
                     long length = in.readInt();
-                    in.skipNBytes(TagType.BYTE.getSize() * length);
+                    skipNBytes(TagType.BYTE.getSize() * length);
                     next();
                     break;
                 }
@@ -356,7 +356,7 @@ public class NBTReader implements Closeable {
                 case INT_ARRAY: {
                     checkState();
                     long length = in.readInt();
-                    in.skipNBytes(TagType.INT.getSize() * length);
+                    skipNBytes(TagType.INT.getSize() * length);
                     next();
                     break;
                 }
@@ -364,7 +364,7 @@ public class NBTReader implements Closeable {
                 case LONG_ARRAY: {
                     checkState();
                     long length = in.readInt();
-                    in.skipNBytes(TagType.LONG.getSize() * length);
+                    skipNBytes(TagType.LONG.getSize() * length);
                     next();
                     break;
                 }
@@ -466,7 +466,30 @@ public class NBTReader implements Closeable {
 
     private void skipUTF() throws IOException {
         int length = in.readUnsignedShort();
-        in.skipNBytes(length);
+        skipNBytes(length);
+    }
+
+    /**
+     * This method is taken here from a newer version of DataInputStream,
+     * to ensure Java 11 compatibility.
+     */
+    private void skipNBytes(long n) throws IOException {
+        while (n > 0) {
+            long ns = in.skip(n);
+            if (ns > 0 && ns <= n) {
+                // adjust number to skip
+                n -= ns;
+            } else if (ns == 0) { // no bytes skipped
+                // read one byte to check for EOS
+                if (in.read() == -1) {
+                    throw new EOFException();
+                }
+                // one byte read so decrement number to skip
+                n--;
+            } else { // skipped negative or too many bytes
+                throw new IOException("Unable to skip exactly");
+            }
+        }
     }
 
     private void checkState() throws IOException {
