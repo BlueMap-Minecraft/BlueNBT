@@ -84,9 +84,9 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                 for (Field field : raw.getDeclaredFields()) {
                     field.setAccessible(true);
 
-                    String name = field.getName();
+                    String[] names = new String[]{ field.getName() };
                     NBTName nbtName = field.getAnnotation(NBTName.class);
-                    if (nbtName != null) name = nbtName.value();
+                    if (nbtName != null) names = nbtName.value();
 
                     TypeToken<?> fieldType = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, field.getGenericType()));
                     NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
@@ -104,13 +104,17 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                             }
                         });
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
-                        fields.put(name, SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field));
+                        FieldAccessor accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
+                        for (String name : names)
+                            fields.put(name, accessor);
                         continue;
                     } else {
                         typeDeserializer = reader -> blueNBT.read(reader, fieldType);
                     }
 
-                    fields.put(name, new TypeDeserializerFieldAccessor(field, typeDeserializer));
+                    FieldAccessor accessor = new TypeDeserializerFieldAccessor(field, typeDeserializer);
+                    for (String name : names)
+                        fields.put(name, accessor);
                 }
 
                 typeToken = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));

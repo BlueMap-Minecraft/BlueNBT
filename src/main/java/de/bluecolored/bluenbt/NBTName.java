@@ -33,6 +33,6 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 public @interface NBTName {
 
-    String value();
+    String[] value();
 
 }
