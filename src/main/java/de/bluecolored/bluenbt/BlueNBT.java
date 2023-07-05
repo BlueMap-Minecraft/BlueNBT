@@ -55,6 +55,7 @@ public class BlueNBT {
     };
 
     public BlueNBT() {
+        register(ObjectAdapterFactory.INSTANCE);
         register(ArrayAdapterFactory.INSTANCE);
         register(PrimitiveAdapterFactory.INSTANCE);
         register(CollectionAdapterFactory.INSTANCE);

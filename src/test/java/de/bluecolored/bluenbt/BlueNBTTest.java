@@ -68,6 +68,27 @@ public class BlueNBTTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    public void testObjectAdapter() throws IOException {
+
+        BlueNBT blueNBT = new BlueNBT();
+        try (InputStream in = NBTReaderTest.class.getResourceAsStream("/level.dat")) {
+            assert in != null;
+
+            Map<String, Object> testData = (Map<String, Object>) blueNBT.read(new GZIPInputStream(in), Object.class);
+            Map<String, Object> data = (Map<String, Object>) testData.get("Data");
+
+            assertEquals((byte) 1, data.get("Difficulty"));
+            assertEquals((byte) 0, data.get("DifficultyLocked"));
+            assertEquals(14590, data.get("rainTime"));
+            assertEquals(1687182273928L, data.get("LastPlayed"));
+            assertEquals(0.2d, data.get("BorderDamagePerBlock"));
+            assertEquals("world", data.get("LevelName"));
+        }
+
+    }
+
+    @Test
     public void testArrays() throws IOException {
 
         BlueNBT blueNBT = new BlueNBT();
