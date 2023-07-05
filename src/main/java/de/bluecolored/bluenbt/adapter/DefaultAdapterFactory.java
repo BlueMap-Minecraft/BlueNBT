@@ -28,7 +28,7 @@ import com.google.gson.internal.$Gson$Types;
 import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
-import lombok.Data;
+import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -36,6 +36,7 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
@@ -52,11 +53,22 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {
 
+        private static final Map<Type, Function<Field, FieldAccessor>> SPECIAL_ACCESSORS = Map.of(
+                boolean.class, field -> (object, reader) -> field.setBoolean(object, PrimitiveAdapterFactory.readBool(reader)),
+                byte.class, field -> (object, reader) -> field.setByte(object, PrimitiveAdapterFactory.readByte(reader)),
+                short.class, field -> (object, reader) -> field.setShort(object, PrimitiveAdapterFactory.readShort(reader)),
+                char.class, field -> (object, reader) -> field.setChar(object, PrimitiveAdapterFactory.readChar(reader)),
+                int.class, field -> (object, reader) -> field.setInt(object, PrimitiveAdapterFactory.readInt(reader)),
+                long.class, field -> (object, reader) -> field.setLong(object, PrimitiveAdapterFactory.readLong(reader)),
+                float.class, field -> (object, reader) -> field.setFloat(object, PrimitiveAdapterFactory.readFloat(reader)),
+                double.class, field -> (object, reader) -> field.setDouble(object, PrimitiveAdapterFactory.readDouble(reader))
+        );
+
         private final TypeToken<T> type;
         private final ObjectConstructor<T> constructor;
         private final BlueNBT blueNBT;
 
-        private final Map<String, FieldInfo> fields = new HashMap<>();
+        private final Map<String, FieldAccessor> fields = new HashMap<>();
 
         public DefaultAdapter(TypeToken<T> type, ObjectConstructor<T> constructor, BlueNBT blueNBT) {
             this.type = type;
@@ -91,18 +103,20 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                                 throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
                             }
                         });
+                    } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
+                        fields.put(name, SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field));
+                        continue;
                     } else {
                         typeDeserializer = reader -> blueNBT.read(reader, fieldType);
                     }
 
-                    fields.put(name, new FieldInfo(field, typeDeserializer));
+                    fields.put(name, new TypeDeserializerFieldAccessor(field, typeDeserializer));
                 }
 
                 typeToken = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));
                 raw = typeToken.getRawType();
             }
         }
-
 
         @Override
         public T read(NBTReader reader) throws IOException {
@@ -113,9 +127,9 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
                 while (reader.peek() != TagType.END) {
                     String name = blueNBT.getFieldNameTransformer().apply(reader.name());
-                    FieldInfo fieldInfo = fields.get(name);
+                    FieldAccessor fieldInfo = fields.get(name);
                     if (fieldInfo != null) {
-                        fieldInfo.getField().set(object, fieldInfo.getTypeDeserializer().read(reader));
+                        fieldInfo.read(object, reader);
                     } else {
                         reader.skip();
                     }
@@ -130,10 +144,19 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
     }
 
-    @Data
-    private static class FieldInfo {
+    private interface FieldAccessor {
+        void read(Object object, NBTReader reader) throws IOException, IllegalAccessException;
+    }
+
+    @RequiredArgsConstructor
+    private static class TypeDeserializerFieldAccessor implements FieldAccessor {
         private final Field field;
         private final TypeDeserializer<?> typeDeserializer;
+
+        @Override
+        public void read(Object object, NBTReader reader) throws IOException, IllegalAccessException {
+            field.set(object, typeDeserializer.read(reader));
+        }
     }
 
 }
