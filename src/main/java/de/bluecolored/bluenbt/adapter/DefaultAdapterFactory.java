@@ -135,7 +135,7 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
 
                     if (fieldInfo == null) {
                         name = blueNBT.getFieldNameTransformer().apply(name);
-                        fields.get(name);
+                        fieldInfo = fields.get(name);
                     }
 
                     if (fieldInfo != null) {
