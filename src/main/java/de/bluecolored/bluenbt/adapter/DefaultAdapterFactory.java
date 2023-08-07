@@ -130,8 +130,14 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                 reader.beginCompound();
 
                 while (reader.peek() != TagType.END) {
-                    String name = blueNBT.getFieldNameTransformer().apply(reader.name());
+                    String name = reader.name();
                     FieldAccessor fieldInfo = fields.get(name);
+
+                    if (fieldInfo == null) {
+                        name = blueNBT.getFieldNameTransformer().apply(name);
+                        fields.get(name);
+                    }
+
                     if (fieldInfo != null) {
                         fieldInfo.read(object, reader);
                     } else {

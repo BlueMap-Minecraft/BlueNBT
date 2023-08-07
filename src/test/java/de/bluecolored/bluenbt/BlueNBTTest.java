@@ -68,6 +68,27 @@ public class BlueNBTTest {
     }
 
     @Test
+    public void testBlueNBT2() throws IOException {
+
+        BlueNBT blueNBT = new BlueNBT();
+        try (InputStream in = NBTReaderTest.class.getResourceAsStream("/3e6b6179-b774-450e-bd16-e6f24ec7185c.dat")) {
+            assert in != null;
+
+            PlayerData playerData = blueNBT.read(new GZIPInputStream(in), PlayerData.class);
+
+            assertEquals(1, playerData.gameMode);
+            assertEquals(-7630795211891119996L, playerData.worldUUIDLeast);
+            assertEquals(-192242363273884439L, playerData.worldUUIDMost);
+            assertEquals(3, playerData.position.length);
+            assertEquals(341.356963005719, playerData.position[0], 0.000001);
+            assertEquals(96.3574341535291, playerData.position[1], 0.000001);
+            assertEquals(436.689526332998, playerData.position[2], 0.000001);
+
+        }
+
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     public void testObjectAdapter() throws IOException {
 
@@ -140,6 +161,23 @@ public class BlueNBTTest {
         }
 
         return compressionType.decompress(new FileInputStream(raf.getFD()));
+    }
+
+    @SuppressWarnings({"unused", "MismatchedReadAndWriteOfArray"})
+    private static class PlayerData {
+
+        @NBTName("playerGameType")
+        private int gameMode;
+
+        @NBTName("Pos")
+        private double[] position;
+
+        @NBTName("WorldUUIDLeast")
+        private long worldUUIDLeast;
+
+        @NBTName("WorldUUIDMost")
+        private long worldUUIDMost;
+
     }
 
     @Data
