@@ -25,9 +25,9 @@
 package de.bluecolored.bluenbt;
 
 import com.google.gson.InstanceCreator;
-import com.google.gson.internal.ConstructorConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.adapter.*;
+import de.bluecolored.bluenbt.internal.ConstructorConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,7 +42,6 @@ public class BlueNBT {
     private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
     private final Map<Type, InstanceCreator<?>> instanceCreators = new HashMap<>();
 
-    @Getter
     private final ConstructorConstructor constructorConstructor = new ConstructorConstructor(instanceCreators);
 
     @Getter @Setter
@@ -124,6 +123,10 @@ public class BlueNBT {
 
     public Object read(NBTReader in, Type type) throws IOException {
         return read(in, TypeToken.get(type));
+    }
+
+    public <T> ObjectConstructor<T> createObjectConstructor(TypeToken<T> type) {
+        return constructorConstructor.get(type);
     }
 
 }

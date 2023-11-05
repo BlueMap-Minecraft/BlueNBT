@@ -24,10 +24,9 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.internal.$Gson$Types;
-import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
+import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -48,7 +47,7 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
     }
 
     public <T> TypeDeserializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
-        return new DefaultAdapter<>(type, blueNBT.getConstructorConstructor().get(type), blueNBT);
+        return new DefaultAdapter<>(type, blueNBT.createObjectConstructor(type), blueNBT);
     }
 
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {
@@ -88,7 +87,7 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                     NBTName nbtName = field.getAnnotation(NBTName.class);
                     if (nbtName != null) names = nbtName.value();
 
-                    TypeToken<?> fieldType = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, field.getGenericType()));
+                    TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
                     NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
                     if (deserializerType == null) {
                         deserializerType = fieldType.getRawType().getAnnotation(NBTDeserializer.class);
@@ -117,7 +116,7 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                         fields.put(name, accessor);
                 }
 
-                typeToken = TypeToken.get($Gson$Types.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));
+                typeToken = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));
                 raw = typeToken.getRawType();
             }
         }

@@ -24,13 +24,12 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.internal.$Gson$Types;
-import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.BlueNBT;
 import de.bluecolored.bluenbt.NBTReader;
 import de.bluecolored.bluenbt.TypeDeserializer;
 import de.bluecolored.bluenbt.TypeDeserializerFactory;
+import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -51,9 +50,9 @@ public class MapAdapterFactory implements TypeDeserializerFactory {
             return Optional.empty();
         }
 
-        Type[] keyAndValueTypes = $Gson$Types.getMapKeyAndValueTypes(type, rawType);
+        Type[] keyAndValueTypes = TypeUtil.getMapKeyAndValueTypes(type, rawType);
         TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(keyAndValueTypes[1]));
-        ObjectConstructor<T> constructor = blueNBT.getConstructorConstructor().get(typeToken);
+        ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         TypeDeserializer<T> result = new MapAdapter(elementTypeDeserializer, constructor);

@@ -24,21 +24,18 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.internal.$Gson$Types;
-import com.google.gson.internal.ObjectConstructor;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.BlueNBT;
 import de.bluecolored.bluenbt.NBTReader;
 import de.bluecolored.bluenbt.TypeDeserializer;
 import de.bluecolored.bluenbt.TypeDeserializerFactory;
+import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class CollectionAdapterFactory implements TypeDeserializerFactory {
 
@@ -53,9 +50,9 @@ public class CollectionAdapterFactory implements TypeDeserializerFactory {
             return Optional.empty();
         }
 
-        Type elementType = $Gson$Types.getCollectionElementType(type, rawType);
+        Type elementType = TypeUtil.getCollectionElementType(type, rawType);
         TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(elementType));
-        ObjectConstructor<T> constructor = blueNBT.getConstructorConstructor().get(typeToken);
+        ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         TypeDeserializer<T> result = new CollectionAdapter(elementTypeDeserializer, constructor);

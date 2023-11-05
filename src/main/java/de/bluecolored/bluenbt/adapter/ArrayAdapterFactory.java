@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.internal.$Gson$Types;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
@@ -46,11 +45,11 @@ public class ArrayAdapterFactory implements TypeDeserializerFactory {
             return Optional.empty();
         }
 
-        Type componentType = $Gson$Types.getArrayComponentType(type);
+        Type componentType = TypeUtil.getArrayComponentType(type);
         TypeDeserializer<?> componentTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(componentType));
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeDeserializer<T> result = new ArrayAdapter($Gson$Types.getRawType(componentType), componentTypeDeserializer);
+        TypeDeserializer<T> result = new ArrayAdapter(TypeUtil.getRawType(componentType), componentTypeDeserializer);
         return Optional.of(result);
     }
 

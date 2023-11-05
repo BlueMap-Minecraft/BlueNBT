@@ -24,9 +24,9 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.internal.LinkedTreeMap;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
+import de.bluecolored.bluenbt.internal.LinkedTreeMap;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
