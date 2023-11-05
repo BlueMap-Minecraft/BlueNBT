@@ -78,6 +78,12 @@ tasks.getByName<Test>("test") {
 spotless {
     java {
         target ("src/*/java/**/*.java")
+        targetExclude(
+            "**/internal/ConstructorConstructor.java",
+            "**/internal/LinkedTreeMap.java",
+            "**/internal/UnsafeAllocator.java",
+            "**/adapter/TypeUtil.java",
+        )
 
         licenseHeaderFile("LICENSE_HEADER")
         indentWithSpaces()
