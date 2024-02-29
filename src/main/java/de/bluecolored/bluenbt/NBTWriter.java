@@ -47,8 +47,6 @@ public class NBTWriter implements Closeable {
             this.out = (DataOutputStream) out;
         else
             this.out = new DataOutputStream(out);
-
-        JsonWriter
     }
 
     @Contract("_ -> this")
