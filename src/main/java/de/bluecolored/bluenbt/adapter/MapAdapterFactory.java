@@ -25,11 +25,7 @@
 package de.bluecolored.bluenbt.adapter;
 
 import com.google.gson.reflect.TypeToken;
-import de.bluecolored.bluenbt.BlueNBT;
-import de.bluecolored.bluenbt.NBTReader;
-import de.bluecolored.bluenbt.TypeDeserializer;
-import de.bluecolored.bluenbt.TypeDeserializerFactory;
-import de.bluecolored.bluenbt.ObjectConstructor;
+import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -37,12 +33,12 @@ import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.Optional;
 
-public class MapAdapterFactory implements TypeDeserializerFactory {
+public class MapAdapterFactory implements TypeAdapterFactory {
 
     public static final MapAdapterFactory INSTANCE = new MapAdapterFactory();
 
     @Override
-    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
+    public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         Type type = typeToken.getType();
 
         Class<? super T> rawType = typeToken.getRawType();
@@ -51,17 +47,24 @@ public class MapAdapterFactory implements TypeDeserializerFactory {
         }
 
         Type[] keyAndValueTypes = TypeUtil.getMapKeyAndValueTypes(type, rawType);
-        TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(keyAndValueTypes[1]));
+
+        // only String keys are supported
+        if (!String.class.equals(keyAndValueTypes[0])) return Optional.empty();
+
+        TypeToken<?> valueType = TypeToken.get(keyAndValueTypes[1]);
+        TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(valueType);
+        TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(valueType);
         ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeDeserializer<T> result = new MapAdapter(elementTypeDeserializer, constructor);
+        TypeAdapter<T> result = new MapAdapter(elementTypeSerializer, elementTypeDeserializer, constructor);
         return Optional.of(result);
     }
 
     @RequiredArgsConstructor
-    static class MapAdapter<E> implements TypeDeserializer<Map<String, E>>  {
+    static class MapAdapter<E> implements TypeAdapter<Map<String, E>>  {
 
+        private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
         private final ObjectConstructor<? extends Map<String, E>> constructor;
 
@@ -76,6 +79,16 @@ public class MapAdapterFactory implements TypeDeserializerFactory {
             }
             reader.endCompound();
             return map;
+        }
+
+        @Override
+        public void write(Map<String, E> value, NBTWriter writer) throws IOException {
+            writer.beginCompound();
+            for (Map.Entry<String, E> entry : value.entrySet()) {
+                writer.name(entry.getKey());
+                typeSerializer.write(entry.getValue(), writer);
+            }
+            writer.endCompound();
         }
 
     }

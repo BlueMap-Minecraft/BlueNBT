@@ -33,21 +33,21 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class PrimitiveAdapterFactory implements TypeDeserializerFactory {
+public class PrimitiveDeserializerFactory implements TypeDeserializerFactory {
 
-    public static final PrimitiveAdapterFactory INSTANCE = new PrimitiveAdapterFactory();
+    public static final PrimitiveDeserializerFactory INSTANCE = new PrimitiveDeserializerFactory();
 
     private static final Map<Type, TypeDeserializer<?>> TYPE_DESERIALIZER_MAP = new HashMap<>();
     static {
-        registerTypeDeserializer(boolean.class, Boolean.class, PrimitiveAdapterFactory::readBool);
-        registerTypeDeserializer(byte.class, Byte.class, PrimitiveAdapterFactory::readByte);
-        registerTypeDeserializer(short.class, Short.class, PrimitiveAdapterFactory::readShort);
-        registerTypeDeserializer(char.class, Character.class, PrimitiveAdapterFactory::readChar);
-        registerTypeDeserializer(int.class, Integer.class, PrimitiveAdapterFactory::readInt);
-        registerTypeDeserializer(long.class, Long.class, PrimitiveAdapterFactory::readLong);
-        registerTypeDeserializer(float.class, Float.class, PrimitiveAdapterFactory::readFloat);
-        registerTypeDeserializer(double.class, Double.class, PrimitiveAdapterFactory::readDouble);
-        registerTypeDeserializer(String.class, null, PrimitiveAdapterFactory::readString);
+        registerTypeDeserializer(boolean.class, Boolean.class, PrimitiveDeserializerFactory::readBool);
+        registerTypeDeserializer(byte.class, Byte.class, PrimitiveDeserializerFactory::readByte);
+        registerTypeDeserializer(short.class, Short.class, PrimitiveDeserializerFactory::readShort);
+        registerTypeDeserializer(char.class, Character.class, PrimitiveDeserializerFactory::readChar);
+        registerTypeDeserializer(int.class, Integer.class, PrimitiveDeserializerFactory::readInt);
+        registerTypeDeserializer(long.class, Long.class, PrimitiveDeserializerFactory::readLong);
+        registerTypeDeserializer(float.class, Float.class, PrimitiveDeserializerFactory::readFloat);
+        registerTypeDeserializer(double.class, Double.class, PrimitiveDeserializerFactory::readDouble);
+        registerTypeDeserializer(String.class, null, PrimitiveDeserializerFactory::readString);
     }
 
     private static void registerTypeDeserializer(Type primitiveType, Type boxedType, TypeDeserializer<?> typeDeserializer) {

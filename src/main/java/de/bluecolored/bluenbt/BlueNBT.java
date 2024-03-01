@@ -33,12 +33,15 @@ import lombok.Setter;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.*;
 
 public class BlueNBT {
 
+    private final List<TypeSerializerFactory> serializerFactories = new ArrayList<>();
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
+    private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new HashMap<>();
     private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
     private final Map<Type, InstanceCreator<?>> instanceCreators = new HashMap<>();
 
@@ -56,17 +59,51 @@ public class BlueNBT {
     public BlueNBT() {
         register(ObjectAdapterFactory.INSTANCE);
         register(ArrayAdapterFactory.INSTANCE);
-        register(PrimitiveAdapterFactory.INSTANCE);
+        register(PrimitiveSerializerFactory.INSTANCE);
+        register(PrimitiveDeserializerFactory.INSTANCE);
         register(CollectionAdapterFactory.INSTANCE);
         register(MapAdapterFactory.INSTANCE);
+    }
+
+    public void register(TypeAdapterFactory typeAdapterFactory) {
+        serializerFactories.add(typeAdapterFactory);
+        deserializerFactories.add(typeAdapterFactory);
+    }
+
+    public void register(TypeSerializerFactory typeSerializerFactory) {
+        serializerFactories.add(typeSerializerFactory);
     }
 
     public void register(TypeDeserializerFactory typeDeserializerFactory) {
         deserializerFactories.add(typeDeserializerFactory);
     }
 
+    public <T> void register(TypeToken<T> type, TypeAdapter<T> typeAdapter) {
+        register(new TypeAdapterFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <U> Optional<TypeAdapter<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
+                if (createType.equals(type))
+                    return Optional.of((TypeAdapter<U>) typeAdapter);
+                return Optional.empty();
+            }
+        });
+    }
+
+    public <T> void register(TypeToken<T> type, TypeSerializer<T> typeSerializer) {
+        register(new TypeSerializerFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <U> Optional<TypeSerializer<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
+                if (createType.equals(type))
+                    return Optional.of((TypeSerializer<U>) typeSerializer);
+                return Optional.empty();
+            }
+        });
+    }
+
     public <T> void register(TypeToken<T> type, TypeDeserializer<T> typeDeserializer) {
-        deserializerFactories.add(new TypeDeserializerFactory() {
+        register(new TypeDeserializerFactory() {
             @Override
             @SuppressWarnings("unchecked")
             public <U> Optional<TypeDeserializer<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
@@ -81,6 +118,26 @@ public class BlueNBT {
         this.instanceCreators.put(type, instanceCreator);
     }
 
+    public <T> TypeSerializer<T> getTypeSerializer(TypeToken<T> type) {
+        @SuppressWarnings("unchecked")
+        TypeSerializer<T> serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
+
+        if (serializer == null) {
+            for (int i = serializerFactories.size() - 1; i >= 0; i--) {
+                TypeSerializerFactory factory = serializerFactories.get(i);
+                serializer = factory.create(type, this).orElse(null);
+                if (serializer != null) break;
+            }
+
+            if (serializer == null)
+                serializer = DefaultSerializerFactory.INSTANCE.createFor(type, this);
+
+            typeSerializerMap.put(type, serializer);
+        }
+
+        return serializer;
+    }
+
     public <T> TypeDeserializer<T> getTypeDeserializer(TypeToken<T> type) {
         @SuppressWarnings("unchecked")
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
@@ -93,12 +150,38 @@ public class BlueNBT {
             }
 
             if (deserializer == null)
-                deserializer = DefaultAdapterFactory.INSTANCE.createFor(type, this);
+                deserializer = DefaultDeserializerFactory.INSTANCE.createFor(type, this);
 
             typeDeserializerMap.put(type, deserializer);
         }
 
         return deserializer;
+    }
+
+    public <T> void write(T object, OutputStream out, TypeToken<T> type) throws IOException {
+        write(object, new NBTWriter(out), type);
+    }
+
+    public <T> void write(T object, NBTWriter out, TypeToken<T> type) throws IOException {
+        getTypeSerializer(type).write(object, out);
+    }
+
+    public <T> void write(T object, OutputStream out, Class<T> type) throws IOException {
+        write(object, out, TypeToken.get(type));
+    }
+
+    public <T> void write(T object, NBTWriter out, Class<T> type) throws IOException {
+        write(object, out, TypeToken.get(type));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void write(Object object, OutputStream out) throws IOException {
+        write(object, out, (Class) object.getClass());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void write(Object object, NBTWriter out) throws IOException {
+        write(object, out, (Class) object.getClass());
     }
 
     public <T> T read(InputStream in, TypeToken<T> type) throws IOException {

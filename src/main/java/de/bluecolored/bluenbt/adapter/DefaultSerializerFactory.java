@@ -26,7 +26,6 @@ package de.bluecolored.bluenbt.adapter;
 
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
-import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -37,44 +36,42 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-public class DefaultAdapterFactory implements TypeDeserializerFactory {
+public class DefaultSerializerFactory implements TypeSerializerFactory {
 
-    public static final DefaultAdapterFactory INSTANCE = new DefaultAdapterFactory();
+    public static final DefaultSerializerFactory INSTANCE = new DefaultSerializerFactory();
 
     @Override
-    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT) {
+    public <T> Optional<TypeSerializer<T>> create(TypeToken<T> type, BlueNBT blueNBT) {
         return Optional.of(createFor(type, blueNBT));
     }
 
-    public <T> TypeDeserializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
-        return new DefaultAdapter<>(type, blueNBT.createObjectConstructor(type), blueNBT);
+    public <T> TypeSerializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
+        return new DefaultAdapter<>(type, blueNBT);
     }
 
-    static class DefaultAdapter<T> implements TypeDeserializer<T>  {
+    static class DefaultAdapter<T> implements TypeSerializer<T>  {
 
         private static final Map<Type, Function<Field, FieldAccessor>> SPECIAL_ACCESSORS = Map.of(
-                boolean.class, field -> (object, reader) -> field.setBoolean(object, PrimitiveAdapterFactory.readBool(reader)),
-                byte.class, field -> (object, reader) -> field.setByte(object, PrimitiveAdapterFactory.readByte(reader)),
-                short.class, field -> (object, reader) -> field.setShort(object, PrimitiveAdapterFactory.readShort(reader)),
-                char.class, field -> (object, reader) -> field.setChar(object, PrimitiveAdapterFactory.readChar(reader)),
-                int.class, field -> (object, reader) -> field.setInt(object, PrimitiveAdapterFactory.readInt(reader)),
-                long.class, field -> (object, reader) -> field.setLong(object, PrimitiveAdapterFactory.readLong(reader)),
-                float.class, field -> (object, reader) -> field.setFloat(object, PrimitiveAdapterFactory.readFloat(reader)),
-                double.class, field -> (object, reader) -> field.setDouble(object, PrimitiveAdapterFactory.readDouble(reader))
+                boolean.class, field -> (object, writer) -> writer.value(field.getBoolean(object) ? (byte) 1 : (byte) 0),
+                byte.class, field -> (object, writer) -> writer.value(field.getByte(object)),
+                short.class, field -> (object, writer) -> writer.value(field.getShort(object)),
+                char.class, field -> (object, writer) -> writer.value(field.getChar(object)),
+                int.class, field -> (object, writer) -> writer.value(field.getInt(object)),
+                long.class, field -> (object, writer) -> writer.value(field.getLong(object)),
+                float.class, field -> (object, writer) -> writer.value(field.getFloat(object)),
+                double.class, field -> (object, writer) -> writer.value(field.getDouble(object))
         );
 
         private final TypeToken<T> type;
-        private final ObjectConstructor<T> constructor;
         private final BlueNBT blueNBT;
 
         private final Map<String, FieldAccessor> fields = new HashMap<>();
 
-        public DefaultAdapter(TypeToken<T> type, ObjectConstructor<T> constructor, BlueNBT blueNBT) {
+        public DefaultAdapter(TypeToken<T> type, BlueNBT blueNBT) {
             this.type = type;
-            this.constructor = constructor;
             this.blueNBT = blueNBT;
 
-            Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
+            Map<Class<? extends TypeSerializer<?>>, TypeSerializer<?>> typeSerializerCache =
                     new HashMap<>();
 
             TypeToken<?> typeToken = type;
@@ -88,18 +85,18 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                     if (nbtName != null) names = nbtName.value();
 
                     TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
-                    NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
-                    if (deserializerType == null) {
-                        deserializerType = fieldType.getRawType().getAnnotation(NBTDeserializer.class);
+                    NBTSerializer serializerType = field.getAnnotation(NBTSerializer.class);
+                    if (serializerType == null) {
+                        serializerType = fieldType.getRawType().getAnnotation(NBTSerializer.class);
                     }
 
-                    TypeDeserializer<?> typeDeserializer;
-                    if (deserializerType != null) {
-                        typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
+                    TypeSerializer<?> typeSerializer;
+                    if (serializerType != null) {
+                        typeSerializer = typeSerializerCache.computeIfAbsent(serializerType.value(), t -> {
                             try {
                                 return t.getDeclaredConstructor().newInstance();
                             } catch (Exception ex) {
-                                throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
+                                throw new RuntimeException("Failed to create Instance of TypeSerializer!", ex);
                             }
                         });
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
@@ -108,10 +105,10 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
                             fields.put(name, accessor);
                         continue;
                     } else {
-                        typeDeserializer = reader -> blueNBT.read(reader, fieldType);
+                        typeSerializer = blueNBT.getTypeSerializer(fieldType);
                     }
 
-                    FieldAccessor accessor = new TypeDeserializerFieldAccessor(field, typeDeserializer);
+                    FieldAccessor accessor = new TypeSerializerFieldAccessor<>(field, typeSerializer);
                     for (String name : names)
                         fields.put(name, accessor);
                 }
@@ -122,30 +119,16 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
         }
 
         @Override
-        public T read(NBTReader reader) throws IOException {
-
+        public void write(T value, NBTWriter writer) throws IOException {
             try {
-                T object = constructor.construct();
-                reader.beginCompound();
+                writer.beginCompound();
 
-                while (reader.peek() != TagType.END) {
-                    String name = reader.name();
-                    FieldAccessor fieldInfo = fields.get(name);
-
-                    if (fieldInfo == null) {
-                        name = blueNBT.getFieldNameTransformer().apply(name);
-                        fieldInfo = fields.get(name);
-                    }
-
-                    if (fieldInfo != null) {
-                        fieldInfo.read(object, reader);
-                    } else {
-                        reader.skip();
-                    }
+                for (Map.Entry<String, FieldAccessor> field : fields.entrySet()) {
+                    writer.name(field.getKey());
+                    field.getValue().write(value, writer);
                 }
 
-                reader.endCompound();
-                return object;
+                writer.endCompound();
             } catch (IllegalAccessException ex) {
                 throw new IOException("Failed to create instance of type '" + type + "'!", ex);
             }
@@ -154,17 +137,18 @@ public class DefaultAdapterFactory implements TypeDeserializerFactory {
     }
 
     private interface FieldAccessor {
-        void read(Object object, NBTReader reader) throws IOException, IllegalAccessException;
+        void write(Object object, NBTWriter writer) throws IOException, IllegalAccessException;
     }
 
     @RequiredArgsConstructor
-    private static class TypeDeserializerFieldAccessor implements FieldAccessor {
+    private static class TypeSerializerFieldAccessor<T> implements FieldAccessor {
         private final Field field;
-        private final TypeDeserializer<?> typeDeserializer;
+        private final TypeSerializer<T> typeSerializer;
 
         @Override
-        public void read(Object object, NBTReader reader) throws IOException, IllegalAccessException {
-            field.set(object, typeDeserializer.read(reader));
+        @SuppressWarnings("unchecked")
+        public void write(Object object, NBTWriter writer) throws IOException, IllegalAccessException {
+            typeSerializer.write((T) field.get(object), writer);
         }
     }
 

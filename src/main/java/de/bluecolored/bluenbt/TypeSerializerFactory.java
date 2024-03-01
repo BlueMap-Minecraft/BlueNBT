@@ -29,8 +29,8 @@ import com.google.gson.reflect.TypeToken;
 import java.util.Optional;
 
 @FunctionalInterface
-public interface TypeDeserializerFactory {
+public interface TypeSerializerFactory {
 
-    <T> Optional<? extends TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT);
+    <T> Optional<? extends TypeSerializer<T>> create(TypeToken<T> type, BlueNBT blueNBT);
 
 }

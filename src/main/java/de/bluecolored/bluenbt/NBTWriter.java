@@ -24,12 +24,14 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.stream.JsonWriter;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -40,6 +42,7 @@ public class NBTWriter implements Closeable {
     private int stackPosition = 0;
     private TagType[] stack = new TagType[32];
     @Nullable private String nextName = null;
+    private int nextListLength = -1;
 
     public NBTWriter(@NotNull OutputStream out) {
         Objects.requireNonNull(out);
@@ -63,11 +66,10 @@ public class NBTWriter implements Closeable {
         advanceStack();
     }
 
-    public void beginList(TagType type, int length) throws IOException {
+    public void beginList(int length) throws IOException {
         tag(TagType.LIST);
         advanceStack();
-        tag(type);
-        out.writeInt(length);
+        this.nextListLength = length;
     }
 
     public void endCompound() throws IOException {
@@ -171,6 +173,15 @@ public class NBTWriter implements Closeable {
     }
 
     private void tag(TagType tag) throws IOException {
+        // init list if pending
+        if (nextListLength != -1) {
+            out.write(tag.getId());
+            out.writeInt(nextListLength);
+            stack[stackPosition] = tag;
+            nextListLength = -1;
+            return;
+        }
+
         if (tag != TagType.END && stack[stackPosition] != null) {
             if (stack[stackPosition] == tag) {
                 if (this.nextName != null)

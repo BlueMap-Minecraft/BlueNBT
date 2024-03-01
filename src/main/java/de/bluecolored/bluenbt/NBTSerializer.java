@@ -24,13 +24,15 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-import java.util.Optional;
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.FIELD})
+public @interface NBTSerializer {
 
-@FunctionalInterface
-public interface TypeDeserializerFactory {
-
-    <T> Optional<? extends TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT);
+    Class<? extends TypeSerializer<?>> value();
 
 }

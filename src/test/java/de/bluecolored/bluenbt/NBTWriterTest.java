@@ -57,7 +57,7 @@ public class NBTWriterTest {
         assertTrue(writer.inCompound());
         assertFalse(writer.inList());
 
-        writer.name("testList").beginList(TagType.DOUBLE, 3);
+        writer.name("testList").beginList(3);
 
         assertTrue(writer.inList());
         assertFalse(writer.inCompound());

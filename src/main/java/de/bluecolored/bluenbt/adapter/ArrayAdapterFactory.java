@@ -34,29 +34,31 @@ import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Type;
 import java.util.Optional;
 
-public class ArrayAdapterFactory implements TypeDeserializerFactory {
+public class ArrayAdapterFactory implements TypeAdapterFactory {
 
     public static final ArrayAdapterFactory INSTANCE = new ArrayAdapterFactory();
 
     @Override
-    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
+    public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         Type type = typeToken.getType();
         if (!(type instanceof GenericArrayType || type instanceof Class && ((Class<?>) type).isArray())) {
             return Optional.empty();
         }
 
         Type componentType = TypeUtil.getArrayComponentType(type);
+        TypeSerializer<?> componentTypeSerializer = blueNBT.getTypeSerializer(TypeToken.get(componentType));
         TypeDeserializer<?> componentTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(componentType));
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeDeserializer<T> result = new ArrayAdapter(TypeUtil.getRawType(componentType), componentTypeDeserializer);
+        TypeAdapter<T> result = new ArrayAdapter(TypeUtil.getRawType(componentType), componentTypeSerializer, componentTypeDeserializer);
         return Optional.of(result);
     }
 
     @RequiredArgsConstructor
-    static class ArrayAdapter<E> implements TypeDeserializer<Object>  {
+    static class ArrayAdapter<E> implements TypeAdapter<Object>  {
 
         private final Class<E> type;
+        private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
 
         @Override
@@ -87,6 +89,28 @@ public class ArrayAdapterFactory implements TypeDeserializerFactory {
             }
             reader.endList();
             return array;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public void write(Object value, NBTWriter writer) throws IOException {
+            if (value instanceof byte[])
+                writer.value((byte[]) value);
+
+            else if (value instanceof int[])
+                writer.value((int[]) value);
+
+            else if (value instanceof long[])
+                writer.value((long[]) value);
+
+            else {
+                int length = Array.getLength(value);
+                writer.beginList(length);
+                for (int i = 0; i < length; i++) {
+                    typeSerializer.write((E) Array.get(value, i), writer);
+                }
+                writer.endList();
+            }
         }
 
     }

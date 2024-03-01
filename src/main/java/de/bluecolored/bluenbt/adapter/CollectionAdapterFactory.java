@@ -25,11 +25,7 @@
 package de.bluecolored.bluenbt.adapter;
 
 import com.google.gson.reflect.TypeToken;
-import de.bluecolored.bluenbt.BlueNBT;
-import de.bluecolored.bluenbt.NBTReader;
-import de.bluecolored.bluenbt.TypeDeserializer;
-import de.bluecolored.bluenbt.TypeDeserializerFactory;
-import de.bluecolored.bluenbt.ObjectConstructor;
+import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
@@ -37,12 +33,12 @@ import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Optional;
 
-public class CollectionAdapterFactory implements TypeDeserializerFactory {
+public class CollectionAdapterFactory implements TypeAdapterFactory {
 
     public static final CollectionAdapterFactory INSTANCE = new CollectionAdapterFactory();
 
     @Override
-    public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
+    public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         Type type = typeToken.getType();
 
         Class<? super T> rawType = typeToken.getRawType();
@@ -51,17 +47,19 @@ public class CollectionAdapterFactory implements TypeDeserializerFactory {
         }
 
         Type elementType = TypeUtil.getCollectionElementType(type, rawType);
+        TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(TypeToken.get(elementType));
         TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(elementType));
         ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeDeserializer<T> result = new CollectionAdapter(elementTypeDeserializer, constructor);
+        TypeAdapter<T> result = new CollectionAdapter(elementTypeSerializer, elementTypeDeserializer, constructor);
         return Optional.of(result);
     }
 
     @RequiredArgsConstructor
-    static class CollectionAdapter<E> implements TypeDeserializer<Collection<E>>  {
+    static class CollectionAdapter<E> implements TypeAdapter<Collection<E>>  {
 
+        private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
         private final ObjectConstructor<? extends Collection<E>> constructor;
 
@@ -75,6 +73,15 @@ public class CollectionAdapterFactory implements TypeDeserializerFactory {
             }
             reader.endList();
             return collection;
+        }
+
+        @Override
+        public void write(Collection<E> value, NBTWriter writer) throws IOException {
+            writer.beginList(value.size());
+            for (E element : value) {
+                typeSerializer.write(element, writer);
+            }
+            writer.endList();
         }
 
     }

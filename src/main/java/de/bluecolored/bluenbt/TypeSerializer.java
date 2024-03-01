@@ -24,13 +24,11 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
-
-import java.util.Optional;
+import java.io.IOException;
 
 @FunctionalInterface
-public interface TypeDeserializerFactory {
+public interface TypeSerializer<T> {
 
-    <T> Optional<? extends TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT);
+    void write(T value, NBTWriter writer) throws IOException;
 
 }
