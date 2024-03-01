@@ -27,6 +27,7 @@ package de.bluecolored.bluenbt.adapter;
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -85,14 +86,11 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                     if (nbtName != null) names = nbtName.value();
 
                     TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
-                    NBTSerializer serializerType = field.getAnnotation(NBTSerializer.class);
-                    if (serializerType == null) {
-                        serializerType = fieldType.getRawType().getAnnotation(NBTSerializer.class);
-                    }
 
                     TypeSerializer<?> typeSerializer;
+                    Class<? extends TypeSerializer<?>> serializerType = findSerializerType(field, fieldType.getRawType());
                     if (serializerType != null) {
-                        typeSerializer = typeSerializerCache.computeIfAbsent(serializerType.value(), t -> {
+                        typeSerializer = typeSerializerCache.computeIfAbsent(serializerType, t -> {
                             try {
                                 return t.getDeclaredConstructor().newInstance();
                             } catch (Exception ex) {
@@ -132,6 +130,22 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
             } catch (IllegalAccessException ex) {
                 throw new IOException("Failed to create instance of type '" + type + "'!", ex);
             }
+        }
+
+        private @Nullable Class<? extends TypeSerializer<?>> findSerializerType(Field field, Class<?> type) {
+            NBTSerializer fieldSerializer = field.getAnnotation(NBTSerializer.class);
+            if (fieldSerializer != null) return fieldSerializer.value();
+
+            NBTAdapter fieldAdapter = field.getAnnotation(NBTAdapter.class);
+            if (fieldAdapter != null) return fieldAdapter.value();
+
+            NBTSerializer typeSerializer = type.getAnnotation(NBTSerializer.class);
+            if (typeSerializer != null) return typeSerializer.value();
+
+            NBTAdapter typeAdapter = type.getAnnotation(NBTAdapter.class);
+            if (typeAdapter != null) return typeAdapter.value();
+
+            return null;
         }
 
     }

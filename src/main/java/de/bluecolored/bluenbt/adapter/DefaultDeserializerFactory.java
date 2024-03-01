@@ -28,6 +28,7 @@ import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -88,14 +89,11 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     if (nbtName != null) names = nbtName.value();
 
                     TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
-                    NBTDeserializer deserializerType = field.getAnnotation(NBTDeserializer.class);
-                    if (deserializerType == null) {
-                        deserializerType = fieldType.getRawType().getAnnotation(NBTDeserializer.class);
-                    }
 
                     TypeDeserializer<?> typeDeserializer;
+                    Class<? extends TypeDeserializer<?>> deserializerType = findDeserializerType(field, fieldType.getRawType());
                     if (deserializerType != null) {
-                        typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType.value(), t -> {
+                        typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType, t -> {
                             try {
                                 return t.getDeclaredConstructor().newInstance();
                             } catch (Exception ex) {
@@ -149,6 +147,22 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             } catch (IllegalAccessException ex) {
                 throw new IOException("Failed to create instance of type '" + type + "'!", ex);
             }
+        }
+
+        private @Nullable Class<? extends TypeDeserializer<?>> findDeserializerType(Field field, Class<?> type) {
+            NBTDeserializer fieldDeserializer = field.getAnnotation(NBTDeserializer.class);
+            if (fieldDeserializer != null) return fieldDeserializer.value();
+
+            NBTAdapter fieldAdapter = field.getAnnotation(NBTAdapter.class);
+            if (fieldAdapter != null) return fieldAdapter.value();
+
+            NBTDeserializer typeDeserializer = type.getAnnotation(NBTDeserializer.class);
+            if (typeDeserializer != null) return typeDeserializer.value();
+
+            NBTAdapter typeAdapter = type.getAnnotation(NBTAdapter.class);
+            if (typeAdapter != null) return typeAdapter.value();
+
+            return null;
         }
 
     }
