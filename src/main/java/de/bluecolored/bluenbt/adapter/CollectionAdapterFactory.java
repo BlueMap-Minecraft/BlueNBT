@@ -77,11 +77,22 @@ public class CollectionAdapterFactory implements TypeAdapterFactory {
 
         @Override
         public void write(Collection<E> value, NBTWriter writer) throws IOException {
-            writer.beginList(value.size());
-            for (E element : value) {
-                typeSerializer.write(element, writer);
+            int size = value.size();
+            if (size == 0) {
+                writer.beginList(size, typeSerializer.type());
+                writer.endList();
+            } else {
+                writer.beginList(size);
+                for (E element : value) {
+                    typeSerializer.write(element, writer);
+                }
+                writer.endList();
             }
-            writer.endList();
+        }
+
+        @Override
+        public TagType type() {
+            return TagType.LIST;
         }
 
     }

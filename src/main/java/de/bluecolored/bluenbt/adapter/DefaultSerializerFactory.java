@@ -52,7 +52,7 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
 
     static class DefaultAdapter<T> implements TypeSerializer<T>  {
 
-        private static final Map<Type, Function<Field, FieldAccessor>> SPECIAL_ACCESSORS = Map.of(
+        private static final Map<Type, Function<Field, SpecialFieldWriter>> SPECIAL_ACCESSORS = Map.of(
                 boolean.class, field -> (object, writer) -> writer.value(field.getBoolean(object) ? (byte) 1 : (byte) 0),
                 byte.class, field -> (object, writer) -> writer.value(field.getByte(object)),
                 short.class, field -> (object, writer) -> writer.value(field.getShort(object)),
@@ -64,13 +64,11 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
         );
 
         private final TypeToken<T> type;
-        private final BlueNBT blueNBT;
 
-        private final Map<String, FieldAccessor> fields = new HashMap<>();
+        private final Map<String, FieldWriter> fields = new HashMap<>();
 
         public DefaultAdapter(TypeToken<T> type, BlueNBT blueNBT) {
             this.type = type;
-            this.blueNBT = blueNBT;
 
             Map<Class<? extends TypeSerializer<?>>, TypeSerializer<?>> typeSerializerCache =
                     new HashMap<>();
@@ -98,7 +96,7 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                             }
                         });
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
-                        FieldAccessor accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
+                        FieldWriter accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
                         for (String name : names)
                             fields.put(name, accessor);
                         continue;
@@ -106,7 +104,7 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                         typeSerializer = blueNBT.getTypeSerializer(fieldType);
                     }
 
-                    FieldAccessor accessor = new TypeSerializerFieldAccessor<>(field, typeSerializer);
+                    FieldWriter accessor = new TypeSerializerFieldWriter<>(field, typeSerializer);
                     for (String name : names)
                         fields.put(name, accessor);
                 }
@@ -121,9 +119,8 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
             try {
                 writer.beginCompound();
 
-                for (Map.Entry<String, FieldAccessor> field : fields.entrySet()) {
-                    writer.name(field.getKey());
-                    field.getValue().write(value, writer);
+                for (Map.Entry<String, FieldWriter> field : fields.entrySet()) {
+                    field.getValue().write(field.getKey(), value, writer);
                 }
 
                 writer.endCompound();
@@ -150,19 +147,35 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
 
     }
 
-    private interface FieldAccessor {
-        void write(Object object, NBTWriter writer) throws IOException, IllegalAccessException;
+    private interface FieldWriter {
+        void write(String name, Object object, NBTWriter writer) throws IOException, IllegalAccessException;
+    }
+
+    private interface SpecialFieldWriter extends FieldWriter {
+
+        @Override
+        default void write(String name, Object object, NBTWriter writer) throws IOException, IllegalAccessException {
+            writer.name(name);
+            writeValue(object, writer);
+        }
+
+        void writeValue(Object object, NBTWriter writer) throws IOException, IllegalAccessException;
+
     }
 
     @RequiredArgsConstructor
-    private static class TypeSerializerFieldAccessor<T> implements FieldAccessor {
+    private static class TypeSerializerFieldWriter<T> implements FieldWriter {
         private final Field field;
         private final TypeSerializer<T> typeSerializer;
 
         @Override
         @SuppressWarnings("unchecked")
-        public void write(Object object, NBTWriter writer) throws IOException, IllegalAccessException {
-            typeSerializer.write((T) field.get(object), writer);
+        public void write(String name, Object object, NBTWriter writer) throws IOException, IllegalAccessException {
+            T value = (T) field.get(object);
+            if (value != null) {
+                writer.name(name);
+                typeSerializer.write(value, writer);
+            }
         }
     }
 

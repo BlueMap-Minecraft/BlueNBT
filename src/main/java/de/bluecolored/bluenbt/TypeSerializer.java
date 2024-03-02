@@ -31,4 +31,12 @@ public interface TypeSerializer<T> {
 
     void write(T value, NBTWriter writer) throws IOException;
 
+    /**
+     * Returns the (root) tag-type this type-serializer produces.
+     * (used to find the correct type when serializing empty lists)
+     */
+    default TagType type() {
+        return TagType.COMPOUND;
+    }
+
 }

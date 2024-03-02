@@ -72,6 +72,11 @@ public class NBTWriter implements Closeable {
         this.nextListLength = length;
     }
 
+    public void beginList(int length, TagType type) throws IOException {
+        beginList(length);
+        tag(type);
+    }
+
     public void endCompound() throws IOException {
         if (!inCompound()) throw new IllegalStateException("Not in a compound!");
         reduceStack();
@@ -175,7 +180,8 @@ public class NBTWriter implements Closeable {
     private void tag(TagType tag) throws IOException {
         // init list if pending
         if (nextListLength != -1) {
-            out.write(tag.getId());
+            if (tag != TagType.END) out.write(tag.getId());
+            else out.write(TagType.COMPOUND.getId());
             out.writeInt(nextListLength);
             stack[stackPosition] = tag;
             nextListLength = -1;

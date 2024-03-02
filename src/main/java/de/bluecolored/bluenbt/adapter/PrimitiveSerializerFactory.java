@@ -39,20 +39,32 @@ public class PrimitiveSerializerFactory implements TypeSerializerFactory {
 
     private static final Map<Type, TypeSerializer<?>> TYPE_SERIALIZER_MAP = new HashMap<>();
     static {
-        registerTypeSerializer(boolean.class, Boolean.class, PrimitiveSerializerFactory::writeBool);
-        registerTypeSerializer(byte.class, Byte.class, PrimitiveSerializerFactory::writeByte);
-        registerTypeSerializer(short.class, Short.class, PrimitiveSerializerFactory::writeShort);
-        registerTypeSerializer(char.class, Character.class, PrimitiveSerializerFactory::writeChar);
-        registerTypeSerializer(int.class, Integer.class, PrimitiveSerializerFactory::writeInt);
-        registerTypeSerializer(long.class, Long.class, PrimitiveSerializerFactory::writeLong);
-        registerTypeSerializer(float.class, Float.class, PrimitiveSerializerFactory::writeFloat);
-        registerTypeSerializer(double.class, Double.class, PrimitiveSerializerFactory::writeDouble);
-        registerTypeSerializer(String.class, null, PrimitiveSerializerFactory::writeString);
+        registerTypeSerializer(boolean.class, Boolean.class, TagType.BYTE, PrimitiveSerializerFactory::writeBool);
+        registerTypeSerializer(byte.class, Byte.class, TagType.BYTE, PrimitiveSerializerFactory::writeByte);
+        registerTypeSerializer(short.class, Short.class, TagType.SHORT, PrimitiveSerializerFactory::writeShort);
+        registerTypeSerializer(char.class, Character.class, TagType.SHORT, PrimitiveSerializerFactory::writeChar);
+        registerTypeSerializer(int.class, Integer.class, TagType.INT, PrimitiveSerializerFactory::writeInt);
+        registerTypeSerializer(long.class, Long.class, TagType.LONG, PrimitiveSerializerFactory::writeLong);
+        registerTypeSerializer(float.class, Float.class, TagType.FLOAT, PrimitiveSerializerFactory::writeFloat);
+        registerTypeSerializer(double.class, Double.class, TagType.DOUBLE, PrimitiveSerializerFactory::writeDouble);
+        registerTypeSerializer(String.class, null, TagType.STRING, PrimitiveSerializerFactory::writeString);
     }
 
-    private static <T> void registerTypeSerializer(Type primitiveType, Type boxedType, TypeSerializer<T> typeDeserializer) {
-        TYPE_SERIALIZER_MAP.put(primitiveType, typeDeserializer);
-        if (boxedType != null) TYPE_SERIALIZER_MAP.put(boxedType, typeDeserializer);
+    private static <T> void registerTypeSerializer(Type primitiveType, Type boxedType, TagType tag, TypeSerializer<T> typeSerializer) {
+        TypeSerializer<T> tagTypeTypeSerializer = new TypeSerializer<T>() {
+            @Override
+            public void write(T value, NBTWriter writer) throws IOException {
+                typeSerializer.write(value, writer);
+            }
+
+            @Override
+            public TagType type() {
+                return tag;
+            }
+        };
+
+        TYPE_SERIALIZER_MAP.put(primitiveType, tagTypeTypeSerializer);
+        if (boxedType != null) TYPE_SERIALIZER_MAP.put(boxedType, tagTypeTypeSerializer);
     }
 
     @Override

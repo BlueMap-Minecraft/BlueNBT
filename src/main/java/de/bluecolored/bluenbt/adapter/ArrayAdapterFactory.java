@@ -105,12 +105,25 @@ public class ArrayAdapterFactory implements TypeAdapterFactory {
 
             else {
                 int length = Array.getLength(value);
-                writer.beginList(length);
-                for (int i = 0; i < length; i++) {
-                    typeSerializer.write((E) Array.get(value, i), writer);
+                if (length == 0) {
+                    writer.beginList(length, typeSerializer.type());
+                    writer.endList();
+                } else {
+                    writer.beginList(length);
+                    for (int i = 0; i < length; i++) {
+                        typeSerializer.write((E) Array.get(value, i), writer);
+                    }
+                    writer.endList();
                 }
-                writer.endList();
             }
+        }
+
+        @Override
+        public TagType type() {
+            if (type.equals(byte.class)) return TagType.BYTE_ARRAY;
+            if (type.equals(int.class)) return TagType.INT_ARRAY;
+            if (type.equals(long.class)) return TagType.LONG_ARRAY;
+            return TagType.LIST;
         }
 
     }
