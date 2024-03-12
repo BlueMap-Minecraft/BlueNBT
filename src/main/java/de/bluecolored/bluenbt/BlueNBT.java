@@ -123,6 +123,9 @@ public class BlueNBT {
         TypeSerializer<T> serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
 
         if (serializer == null) {
+            FutureTypeSerializer<T> future = new FutureTypeSerializer<>();
+            typeSerializerMap.put(type, future); // set future before creation of new serializers to avoid recursive creation
+
             for (int i = serializerFactories.size() - 1; i >= 0; i--) {
                 TypeSerializerFactory factory = serializerFactories.get(i);
                 serializer = factory.create(type, this).orElse(null);
@@ -132,6 +135,7 @@ public class BlueNBT {
             if (serializer == null)
                 serializer = DefaultSerializerFactory.INSTANCE.createFor(type, this);
 
+            future.complete(serializer);
             typeSerializerMap.put(type, serializer);
         }
 
@@ -143,6 +147,9 @@ public class BlueNBT {
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
 
         if (deserializer == null) {
+            FutureTypeDeserializer<T> future = new FutureTypeDeserializer<>();
+            typeDeserializerMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+
             for (int i = deserializerFactories.size() - 1; i >= 0; i--) {
                 TypeDeserializerFactory factory = deserializerFactories.get(i);
                 deserializer = factory.create(type, this).orElse(null);
@@ -152,6 +159,7 @@ public class BlueNBT {
             if (deserializer == null)
                 deserializer = DefaultDeserializerFactory.INSTANCE.createFor(type, this);
 
+            future.complete(deserializer);
             typeDeserializerMap.put(type, deserializer);
         }
 
@@ -210,6 +218,46 @@ public class BlueNBT {
 
     public <T> ObjectConstructor<T> createObjectConstructor(TypeToken<T> type) {
         return constructorConstructor.get(type);
+    }
+
+    private static class FutureTypeSerializer<T> implements TypeSerializer<T> {
+
+        private TypeSerializer<T> value;
+
+        public void complete(TypeSerializer<T> value) {
+            if (this.value != null) throw new IllegalStateException("FutureTypeSerializer already completed!");
+            this.value = Objects.requireNonNull(value);
+        }
+
+        @Override
+        public void write(T value, NBTWriter writer) throws IOException {
+            if (this.value == null) throw new IllegalStateException("FutureTypeSerializer not completed!");
+            this.value.write(value, writer);
+        }
+
+        @Override
+        public TagType type() {
+            if (this.value == null) throw new IllegalStateException("FutureTypeSerializer is not ready!");
+            return this.value.type();
+        }
+
+    }
+
+    private static class FutureTypeDeserializer<T> implements TypeDeserializer<T> {
+
+        private TypeDeserializer<T> value;
+
+        public void complete(TypeDeserializer<T> value) {
+            if (this.value != null) throw new IllegalStateException("FutureTypeDeserializer already completed!");
+            this.value = Objects.requireNonNull(value);
+        }
+
+        @Override
+        public T read(NBTReader reader) throws IOException {
+            if (this.value == null) throw new IllegalStateException("FutureTypeDeserializer is not ready!");
+            return this.value.read(reader);
+        }
+
     }
 
 }

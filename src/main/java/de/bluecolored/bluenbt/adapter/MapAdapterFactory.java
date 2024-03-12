@@ -30,8 +30,11 @@ import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 public class MapAdapterFactory implements TypeAdapterFactory {
 
@@ -48,32 +51,56 @@ public class MapAdapterFactory implements TypeAdapterFactory {
 
         Type[] keyAndValueTypes = TypeUtil.getMapKeyAndValueTypes(type, rawType);
 
-        // only String keys are supported
-        if (!String.class.equals(keyAndValueTypes[0])) return Optional.empty();
+        Function<?, String> toStringFunction;
+        Function<String, ?> fromStringFunction;
+        Class<?> keyType = TypeUtil.getRawType(keyAndValueTypes[0]);
+        if (String.class.equals(keyType)) {
+            toStringFunction = Function.identity();
+            fromStringFunction = Function.identity();
+        } else if (Enum.class.isAssignableFrom(keyType)) {
+            toStringFunction = (Function<Enum<?>, String>) Enum::name;
+            //noinspection unchecked, rawtypes
+            fromStringFunction = (Function<String, Enum>) name -> Enum.valueOf((Class<? extends Enum>) keyAndValueTypes[0], name);
+        } else {
+            // key-type not supported
+            return Optional.empty();
+        }
 
         TypeToken<?> valueType = TypeToken.get(keyAndValueTypes[1]);
         TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(valueType);
         TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(valueType);
+
         ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeAdapter<T> result = new MapAdapter(elementTypeSerializer, elementTypeDeserializer, constructor);
+        TypeAdapter<T> result = new MapAdapter(
+                toStringFunction,
+                fromStringFunction,
+                elementTypeSerializer,
+                elementTypeDeserializer,
+                constructor
+        );
         return Optional.of(result);
     }
 
     @RequiredArgsConstructor
-    static class MapAdapter<E> implements TypeAdapter<Map<String, E>>  {
+    static class MapAdapter<K, E> implements TypeAdapter<Map<K, E>>  {
+
+        private final Function<K, String> toStringFunction;
+        private final Function<String, K> fromStringFunction;
 
         private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
-        private final ObjectConstructor<? extends Map<String, E>> constructor;
+
+        private final ObjectConstructor<? extends Map<K, E>> constructor;
 
         @Override
-        public Map<String, E> read(NBTReader reader) throws IOException {
-            Map<String, E> map = constructor.construct();
+        public Map<K, E> read(NBTReader reader) throws IOException {
+            Map<K, E> map = constructor.construct();
             reader.beginCompound();
             while (reader.hasNext()) {
-                String key = reader.name();
+                String keyString = reader.name();
+                K key = fromStringFunction.apply(keyString);
                 E instance = typeDeserializer.read(reader);
                 map.put(key, instance);
             }
@@ -82,10 +109,11 @@ public class MapAdapterFactory implements TypeAdapterFactory {
         }
 
         @Override
-        public void write(Map<String, E> value, NBTWriter writer) throws IOException {
+        public void write(Map<K, E> value, NBTWriter writer) throws IOException {
             writer.beginCompound();
-            for (Map.Entry<String, E> entry : value.entrySet()) {
-                writer.name(entry.getKey());
+            for (Map.Entry<K, E> entry : value.entrySet()) {
+                String keyString = toStringFunction.apply(entry.getKey());
+                writer.name(keyString);
                 typeSerializer.write(entry.getValue(), writer);
             }
             writer.endCompound();

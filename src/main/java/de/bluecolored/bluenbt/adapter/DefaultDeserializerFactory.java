@@ -48,7 +48,11 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
     }
 
     public <T> TypeDeserializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
-        return new DefaultAdapter<>(type, blueNBT.createObjectConstructor(type), blueNBT);
+        try {
+            return new DefaultAdapter<>(type, blueNBT.createObjectConstructor(type), blueNBT);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to create Default-TypeSerializer for type: " + type, ex);
+        }
     }
 
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {

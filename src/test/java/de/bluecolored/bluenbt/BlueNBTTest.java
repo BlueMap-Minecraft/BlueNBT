@@ -30,16 +30,11 @@ import lombok.EqualsAndHashCode;
 import net.querz.nbt.mca.CompressionType;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -131,6 +126,30 @@ public class BlueNBTTest {
 
     }
 
+    @Test
+    public void testEnumMap() throws IOException {
+        EnumMap<TestEnum, String> testMap = new EnumMap<>(TestEnum.class);
+        testMap.put(TestEnum.SOME_TEST, "someTestValue");
+        testMap.put(TestEnum.TEST1, "test1Value");
+        testMap.put(TestEnum.ABC, "abcValue");
+
+        BlueNBT blueNBT = new BlueNBT();
+
+        byte[] data;
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            blueNBT.write(testMap, out, new TypeToken<>() {});
+            data = out.toByteArray();
+        }
+
+        EnumMap<TestEnum, String> resultMap;
+        try (ByteArrayInputStream in = new ByteArrayInputStream(data)) {
+            resultMap = blueNBT.read(in, new TypeToken<>() {});
+        }
+
+        assertEquals(testMap, resultMap);
+
+    }
+
     @SuppressWarnings({"resource", "SameParameterValue"})
     private InputStream loadMcaFileChunk(int chunkX, int chunkZ) throws IOException {
         Path regionFile = Files.createTempFile(null, null);
@@ -161,6 +180,12 @@ public class BlueNBTTest {
         }
 
         return compressionType.decompress(new FileInputStream(raf.getFD()));
+    }
+
+    private enum TestEnum {
+        TEST1,
+        SOME_TEST,
+        ABC
     }
 
     @SuppressWarnings({"unused", "MismatchedReadAndWriteOfArray"})

@@ -20,19 +20,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.SortedSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -149,18 +137,23 @@ public final class ConstructorConstructor {
     }
 
     if (Map.class.isAssignableFrom(rawType)) {
+
       if (ConcurrentNavigableMap.class.isAssignableFrom(rawType)) {
         return () -> (T) new ConcurrentSkipListMap<>();
       } else if (ConcurrentMap.class.isAssignableFrom(rawType)) {
         return () -> (T) new ConcurrentHashMap<>();
       } else if (SortedMap.class.isAssignableFrom(rawType)) {
         return () -> (T) new TreeMap<>();
-      } else if (type instanceof ParameterizedType && !(String.class.isAssignableFrom(
-          TypeToken.get(((ParameterizedType) type).getActualTypeArguments()[0]).getRawType()))) {
-        return () -> (T) new LinkedHashMap<>();
-      } else {
-        return () -> (T) new LinkedTreeMap<String, Object>();
+      } else if (type instanceof ParameterizedType) {
+        Class<?> keyType = TypeToken.get(((ParameterizedType) type).getActualTypeArguments()[0]).getRawType();
+        if (EnumMap.class.isAssignableFrom(rawType)) {
+          return () -> (T) new EnumMap(keyType);
+        } else if (String.class.isAssignableFrom(keyType)) {
+          return () -> (T) new LinkedTreeMap<String, Object>();
+        }
       }
+
+      return () -> (T) new LinkedHashMap<>();
     }
 
     return null;
@@ -179,7 +172,7 @@ public final class ConstructorConstructor {
                 return (T) newInstance;
             } catch (Exception e) {
                 throw new RuntimeException(("Unable to invoke no-args constructor for " + type + ". "
-                        + "Register an InstanceCreator with Gson for this type may fix this problem."), e);
+                        + "Register an InstanceCreator with BlueNBT for this type may fix this problem."), e);
             }
         }
     };
