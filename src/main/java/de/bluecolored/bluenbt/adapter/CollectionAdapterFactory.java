@@ -29,8 +29,10 @@ import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 
 public class CollectionAdapterFactory implements TypeAdapterFactory {
@@ -84,7 +86,10 @@ public class CollectionAdapterFactory implements TypeAdapterFactory {
             } else {
                 writer.beginList(size);
                 for (E element : value) {
-                    typeSerializer.write(element, writer);
+                    typeSerializer.write(
+                            Objects.requireNonNull(element, "'null' values are not supported in a list."),
+                            writer
+                    );
                 }
                 writer.endList();
             }

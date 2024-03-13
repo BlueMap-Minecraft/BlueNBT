@@ -83,8 +83,8 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     new HashMap<>();
 
             TypeToken<?> typeToken = type;
-            Class<?> raw = typeToken.getRawType();
-            while (raw != Object.class) {
+            Class<?> raw;
+            while (typeToken != null && (raw = typeToken.getRawType()) != Object.class) {
                 for (Field field : raw.getDeclaredFields()) {
                     field.setAccessible(true);
 
@@ -118,8 +118,8 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                         fields.put(name, accessor);
                 }
 
-                typeToken = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass()));
-                raw = typeToken.getRawType();
+                Type superType = TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass());
+                typeToken = superType != null ? TypeToken.get(superType) : null;
             }
         }
 

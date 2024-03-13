@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Type;
+import java.util.Objects;
 import java.util.Optional;
 
 public class ArrayAdapterFactory implements TypeAdapterFactory {
@@ -111,7 +112,10 @@ public class ArrayAdapterFactory implements TypeAdapterFactory {
                 } else {
                     writer.beginList(length);
                     for (int i = 0; i < length; i++) {
-                        typeSerializer.write((E) Array.get(value, i), writer);
+                        typeSerializer.write(
+                                Objects.requireNonNull((E) Array.get(value, i), "'null' values are not supported in a list."),
+                                writer
+                        );
                     }
                     writer.endList();
                 }
