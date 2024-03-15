@@ -87,8 +87,10 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             Class<?> raw;
             while (typeToken != null && (raw = typeToken.getRawType()) != Object.class) {
                 for (Field field : raw.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers()))
+                    int modifiers = field.getModifiers();
+                    if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers))
                         continue;
+
                     field.setAccessible(true);
 
                     String[] names = new String[]{ field.getName() };
@@ -102,6 +104,12 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     if (deserializerType != null) {
                         typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType, t -> {
                             try {
+                                // try BlueNBT constructor
+                                try {
+                                    return t.getDeclaredConstructor(BlueNBT.class).newInstance(blueNBT);
+                                } catch (NoSuchMethodException ignore) {}
+
+                                // use no-args constructor
                                 return t.getDeclaredConstructor().newInstance();
                             } catch (Exception ex) {
                                 throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
