@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
@@ -86,6 +87,8 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             Class<?> raw;
             while (typeToken != null && (raw = typeToken.getRawType()) != Object.class) {
                 for (Field field : raw.getDeclaredFields()) {
+                    if (Modifier.isStatic(field.getModifiers()))
+                        continue;
                     field.setAccessible(true);
 
                     String[] names = new String[]{ field.getName() };
