@@ -116,6 +116,9 @@ tasks.javadoc {
                 "https://docs.oracle.com/javase/8/docs/api/",
                 "https://javadoc.io/doc/com.google.code.gson/gson/2.8.0/",
             )
+            addStringOption("Xdoclint:none", "-quiet")
+            if (JavaVersion.current().isJava9Compatible)
+                addBooleanOption("html5", true)
         }
     }
 }
