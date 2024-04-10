@@ -26,17 +26,12 @@ package de.bluecolored.bluenbt.adapter;
 
 import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
-import de.bluecolored.bluenbt.ObjectConstructor;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.*;
+import java.util.*;
 import java.util.function.Function;
 
 public class DefaultDeserializerFactory implements TypeDeserializerFactory {
@@ -74,6 +69,8 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
         private final BlueNBT blueNBT;
 
         private final Map<String, FieldAccessor> fields = new HashMap<>();
+
+        private final Collection<PostSerializeAction<T>> postSerializeActions = new ArrayList<>(0);
 
         public DefaultAdapter(TypeToken<T> type, ObjectConstructor<T> constructor, BlueNBT blueNBT) {
             this.type = type;
@@ -129,6 +126,16 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                         fields.put(name, accessor);
                 }
 
+                for (Method method : raw.getDeclaredMethods()) {
+                    if (
+                            method.getAnnotation(NBTPostDeserialize.class) != null &&
+                            method.getParameterCount() == 0
+                    ) {
+                        method.setAccessible(true);
+                        postSerializeActions.add(method::invoke);
+                    }
+                }
+
                 Type superType = TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass());
                 typeToken = superType != null ? TypeToken.get(superType) : null;
             }
@@ -158,8 +165,14 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                 }
 
                 reader.endCompound();
+
+                // run post serialization actions
+                if (!postSerializeActions.isEmpty())
+                    for (PostSerializeAction<T> action : postSerializeActions)
+                        action.invoke(object);
+
                 return object;
-            } catch (IllegalAccessException ex) {
+            } catch (IllegalAccessException | InvocationTargetException ex) {
                 throw new IOException("Failed to create instance of type '" + type + "'!", ex);
             }
         }
@@ -182,8 +195,14 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
     }
 
+    @FunctionalInterface
     private interface FieldAccessor {
         void read(Object object, NBTReader reader) throws IOException, IllegalAccessException;
+    }
+
+    @FunctionalInterface
+    private interface PostSerializeAction<T> {
+        void invoke(T object) throws IOException, IllegalAccessException, InvocationTargetException;
     }
 
     @RequiredArgsConstructor
