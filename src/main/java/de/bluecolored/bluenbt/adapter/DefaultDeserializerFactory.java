@@ -77,9 +77,6 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             this.constructor = constructor;
             this.blueNBT = blueNBT;
 
-            Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache =
-                    new HashMap<>();
-
             TypeToken<?> typeToken = type;
             Class<?> raw;
             while (typeToken != null && (raw = typeToken.getRawType()) != Object.class) {
@@ -99,19 +96,11 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     TypeDeserializer<?> typeDeserializer;
                     Class<? extends TypeDeserializer<?>> deserializerType = findDeserializerType(field, fieldType.getRawType());
                     if (deserializerType != null) {
-                        typeDeserializer = typeDeserializerCache.computeIfAbsent(deserializerType, t -> {
-                            try {
-                                // try BlueNBT constructor
-                                try {
-                                    return t.getDeclaredConstructor(BlueNBT.class).newInstance(blueNBT);
-                                } catch (NoSuchMethodException ignore) {}
-
-                                // use no-args constructor
-                                return t.getDeclaredConstructor().newInstance();
-                            } catch (Exception ex) {
-                                throw new RuntimeException("Failed to create Instance of TypeDeserializer!", ex);
-                            }
-                        });
+                        try {
+                            typeDeserializer = createTypeDeserializerInstance(deserializerType, fieldType, blueNBT);
+                        } catch (Exception ex) {
+                            throw new IllegalStateException("Failed to create instance of TypeDeserializer: " + deserializerType, ex);
+                        }
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldAccessor accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
                         for (String name : names)
@@ -191,6 +180,30 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             if (typeAdapter != null) return typeAdapter.value();
 
             return null;
+        }
+
+        private TypeDeserializer<?> createTypeDeserializerInstance(
+                Class<? extends TypeDeserializer<?>> deserializerType,
+                TypeToken<?> fieldType,
+                BlueNBT blueNBT
+        ) throws ReflectiveOperationException {
+            // try TypeToken & BlueNBT constructor
+            try {
+                return deserializerType.getDeclaredConstructor(TypeToken.class, BlueNBT.class).newInstance(fieldType, blueNBT);
+            } catch (NoSuchMethodException ignore) {}
+
+            // try TypeToken constructor
+            try {
+                return deserializerType.getDeclaredConstructor(TypeToken.class).newInstance(fieldType);
+            } catch (NoSuchMethodException ignore) {}
+
+            // try BlueNBT constructor
+            try {
+                return deserializerType.getDeclaredConstructor(BlueNBT.class).newInstance(blueNBT);
+            } catch (NoSuchMethodException ignore) {}
+
+            // use no-args constructor
+            return deserializerType.getDeclaredConstructor().newInstance();
         }
 
     }
