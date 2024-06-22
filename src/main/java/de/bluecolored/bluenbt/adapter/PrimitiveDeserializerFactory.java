@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 
 import java.io.IOException;
@@ -68,132 +67,134 @@ public class PrimitiveDeserializerFactory implements TypeDeserializerFactory {
 
     public static boolean readBool(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case BYTE: return reader.nextByte() != 0;
-            case SHORT: return reader.nextShort() != 0;
-            case INT: return reader.nextInt() != 0;
-            case LONG: return reader.nextLong() != 0L;
-            case FLOAT: return reader.nextFloat() != 0f;
-            case DOUBLE: return reader.nextDouble() != 0d;
-            case STRING: return Boolean.parseBoolean(reader.nextString());
-            default: throw new IllegalStateException("STRING or any number tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case BYTE -> reader.nextByte() != 0;
+            case SHORT -> reader.nextShort() != 0;
+            case INT -> reader.nextInt() != 0;
+            case LONG -> reader.nextLong() != 0L;
+            case FLOAT -> reader.nextFloat() != 0f;
+            case DOUBLE -> reader.nextDouble() != 0d;
+            case STRING -> Boolean.parseBoolean(reader.nextString());
+            default -> throw new IllegalStateException("STRING or any number tag expected but got " + type +
+                    ". At: " + reader.path());
+        };
     }
 
     public static byte readByte(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case BYTE: return reader.nextByte();
-            case SHORT: return (byte) reader.nextShort();
-            case INT: return (byte) reader.nextInt();
-            case LONG: return (byte) reader.nextLong();
-            case FLOAT: return (byte) reader.nextFloat();
-            case DOUBLE: return (byte) reader.nextDouble();
-            case STRING: return Byte.parseByte(reader.nextString());
-            default: throw new IllegalStateException("BYTE tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case BYTE -> reader.nextByte();
+            case SHORT -> (byte) reader.nextShort();
+            case INT -> (byte) reader.nextInt();
+            case LONG -> (byte) reader.nextLong();
+            case FLOAT -> (byte) reader.nextFloat();
+            case DOUBLE -> (byte) reader.nextDouble();
+            case STRING -> Byte.parseByte(reader.nextString());
+            default -> throw new IllegalStateException("BYTE tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static short readShort(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case BYTE: return reader.nextByte();
-            case SHORT: return reader.nextShort();
-            case INT: return (short) reader.nextInt();
-            case LONG: return (short) reader.nextLong();
-            case FLOAT: return (short) reader.nextFloat();
-            case DOUBLE: return (short) reader.nextDouble();
-            case STRING: return Short.parseShort(reader.nextString());
-            default: throw new IllegalStateException("SHORT tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case BYTE -> reader.nextByte();
+            case SHORT -> reader.nextShort();
+            case INT -> (short) reader.nextInt();
+            case LONG -> (short) reader.nextLong();
+            case FLOAT -> (short) reader.nextFloat();
+            case DOUBLE -> (short) reader.nextDouble();
+            case STRING -> Short.parseShort(reader.nextString());
+            default -> throw new IllegalStateException("SHORT tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static char readChar(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case BYTE: return (char) reader.nextByte();
-            case SHORT: return (char) reader.nextShort();
-            case INT: return (char) reader.nextInt();
-            case LONG: return (char) reader.nextLong();
-            case FLOAT: return (char) reader.nextFloat();
-            case DOUBLE: return (char) reader.nextDouble();
-            case STRING:
+        return switch (type) {
+            case BYTE -> (char) reader.nextByte();
+            case SHORT -> (char) reader.nextShort();
+            case INT -> (char) reader.nextInt();
+            case LONG -> (char) reader.nextLong();
+            case FLOAT -> (char) reader.nextFloat();
+            case DOUBLE -> (char) reader.nextDouble();
+            case STRING -> {
                 String string = reader.nextString();
                 if (string.length() != 1)
                     throw new IllegalStateException("Can not parse char from string '" + string + "'");
-                return string.charAt(0);
-            default: throw new IllegalStateException("Any number tag expected but got " + type + ". At: " + reader.path());
-        }
+                yield string.charAt(0);
+            }
+            default -> throw new IllegalStateException("Any number tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static int readInt(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case BYTE: return reader.nextByte();
-            case SHORT: return reader.nextShort();
-            case INT: return reader.nextInt();
-            case LONG: return (int) reader.nextLong();
-            case FLOAT: return (int) reader.nextFloat();
-            case DOUBLE: return (int) reader.nextDouble();
-            case STRING: return Integer.parseInt(reader.nextString());
-            default: throw new IllegalStateException("INT tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case BYTE -> reader.nextByte();
+            case SHORT -> reader.nextShort();
+            case INT -> reader.nextInt();
+            case LONG -> (int) reader.nextLong();
+            case FLOAT -> (int) reader.nextFloat();
+            case DOUBLE -> (int) reader.nextDouble();
+            case STRING -> Integer.parseInt(reader.nextString());
+            default -> throw new IllegalStateException("INT tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static long readLong(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case LONG: return reader.nextLong();
-            case BYTE: return reader.nextByte();
-            case SHORT: return reader.nextShort();
-            case INT: return reader.nextInt();
-            case FLOAT: return (long) reader.nextFloat();
-            case DOUBLE: return (long) reader.nextDouble();
-            case STRING: return Long.parseLong(reader.nextString());
-            default: throw new IllegalStateException("LONG tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case LONG -> reader.nextLong();
+            case BYTE -> reader.nextByte();
+            case SHORT -> reader.nextShort();
+            case INT -> reader.nextInt();
+            case FLOAT -> (long) reader.nextFloat();
+            case DOUBLE -> (long) reader.nextDouble();
+            case STRING -> Long.parseLong(reader.nextString());
+            default -> throw new IllegalStateException("LONG tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static float readFloat(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case FLOAT: return reader.nextFloat();
-            case BYTE: return reader.nextByte();
-            case SHORT: return reader.nextShort();
-            case INT: return reader.nextInt();
-            case LONG: return reader.nextLong();
-            case DOUBLE: return (float) reader.nextDouble();
-            case STRING: return Float.parseFloat(reader.nextString());
-            default: throw new IllegalStateException("FLOAT tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case FLOAT -> reader.nextFloat();
+            case BYTE -> reader.nextByte();
+            case SHORT -> reader.nextShort();
+            case INT -> reader.nextInt();
+            case LONG -> reader.nextLong();
+            case DOUBLE -> (float) reader.nextDouble();
+            case STRING -> Float.parseFloat(reader.nextString());
+            default -> throw new IllegalStateException("FLOAT tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static double readDouble(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case DOUBLE: return reader.nextDouble();
-            case BYTE: return reader.nextByte();
-            case SHORT: return reader.nextShort();
-            case INT: return reader.nextInt();
-            case LONG: return reader.nextLong();
-            case FLOAT: return reader.nextFloat();
-            case STRING: return Double.parseDouble(reader.nextString());
-            default: throw new IllegalStateException("DOUBLE tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case DOUBLE -> reader.nextDouble();
+            case BYTE -> reader.nextByte();
+            case SHORT -> reader.nextShort();
+            case INT -> reader.nextInt();
+            case LONG -> reader.nextLong();
+            case FLOAT -> reader.nextFloat();
+            case STRING -> Double.parseDouble(reader.nextString());
+            default -> throw new IllegalStateException("DOUBLE tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
     public static String readString(NBTReader reader) throws IOException {
         TagType type = reader.peek();
-        switch (type) {
-            case STRING: return reader.nextString();
-            case BYTE: return String.valueOf(reader.nextByte());
-            case SHORT: return String.valueOf(reader.nextShort());
-            case INT: return String.valueOf(reader.nextInt());
-            case LONG: return String.valueOf(reader.nextLong());
-            case FLOAT: return String.valueOf(reader.nextFloat());
-            case DOUBLE: return String.valueOf(reader.nextDouble());
-            default: throw new IllegalStateException("STRING tag expected but got " + type + ". At: " + reader.path());
-        }
+        return switch (type) {
+            case STRING -> reader.nextString();
+            case BYTE -> String.valueOf(reader.nextByte());
+            case SHORT -> String.valueOf(reader.nextShort());
+            case INT -> String.valueOf(reader.nextInt());
+            case LONG -> String.valueOf(reader.nextLong());
+            case FLOAT -> String.valueOf(reader.nextFloat());
+            case DOUBLE -> String.valueOf(reader.nextDouble());
+            default -> throw new IllegalStateException("STRING tag expected but got " + type + ". At: " + reader.path());
+        };
     }
 
 }

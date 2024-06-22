@@ -24,10 +24,7 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.InstanceCreator;
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.adapter.*;
-import de.bluecolored.bluenbt.internal.ConstructorConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -41,11 +38,10 @@ public class BlueNBT {
 
     private final List<TypeSerializerFactory> serializerFactories = new ArrayList<>();
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
+    private final List<InstanceCreatorFactory> instanceCreatorFactories = new ArrayList<>();
     private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new HashMap<>();
     private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
-    private final Map<Type, InstanceCreator<?>> instanceCreators = new HashMap<>();
-
-    private final ConstructorConstructor constructorConstructor = new ConstructorConstructor(instanceCreators);
+    private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new HashMap<>();
 
     @Getter @Setter
     private FieldNameTransformer fieldNameTransformer = s -> {
@@ -76,6 +72,10 @@ public class BlueNBT {
 
     public void register(TypeDeserializerFactory typeDeserializerFactory) {
         deserializerFactories.add(typeDeserializerFactory);
+    }
+
+    public void register(InstanceCreatorFactory instanceCreatorFactory) {
+        instanceCreatorFactories.add(instanceCreatorFactory);
     }
 
     public <T> void register(TypeToken<T> type, TypeAdapter<T> typeAdapter) {
@@ -115,7 +115,15 @@ public class BlueNBT {
     }
 
     public <T> void register(Type type, InstanceCreator<T> instanceCreator) {
-        this.instanceCreators.put(type, instanceCreator);
+        register(new InstanceCreatorFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <U> Optional<? extends InstanceCreator<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
+                if (createType.equals(type))
+                    return Optional.of((InstanceCreator<U>) instanceCreator);
+                return Optional.empty();
+            }
+        });
     }
 
     public <T> TypeSerializer<T> getTypeSerializer(TypeToken<T> type) {
@@ -166,6 +174,30 @@ public class BlueNBT {
         return deserializer;
     }
 
+    public <T> InstanceCreator<T> getInstanceCreator(TypeToken<T> type) {
+        @SuppressWarnings("unchecked")
+        InstanceCreator<T> instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
+
+        if (instanceCreator == null) {
+            FutureInstanceCreator<T> future = new FutureInstanceCreator<>();
+            instanceCreatorMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+
+            for (int i = instanceCreatorFactories.size() - 1; i >= 0; i--) {
+                InstanceCreatorFactory factory = instanceCreatorFactories.get(i);
+                instanceCreator = factory.create(type, this).orElse(null);
+                if (instanceCreator != null) break;
+            }
+
+            if (instanceCreator == null)
+                instanceCreator = DefaultInstanceCreatorFactory.INSTANCE.createFor(type, this);
+
+            future.complete(instanceCreator);
+            instanceCreatorMap.put(type, instanceCreator);
+        }
+
+        return instanceCreator;
+    }
+
     public <T> void write(T object, OutputStream out, TypeToken<T> type) throws IOException {
         write(object, new NBTWriter(out), type);
     }
@@ -175,11 +207,11 @@ public class BlueNBT {
     }
 
     public <T> void write(T object, OutputStream out, Class<T> type) throws IOException {
-        write(object, out, TypeToken.get(type));
+        write(object, out, TypeToken.of(type));
     }
 
     public <T> void write(T object, NBTWriter out, Class<T> type) throws IOException {
-        write(object, out, TypeToken.get(type));
+        write(object, out, TypeToken.of(type));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -201,23 +233,19 @@ public class BlueNBT {
     }
 
     public <T> T read(InputStream in, Class<T> type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
     public <T> T read(NBTReader in, Class<T> type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
     public Object read(InputStream in, Type type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
     public Object read(NBTReader in, Type type) throws IOException {
-        return read(in, TypeToken.get(type));
-    }
-
-    public <T> ObjectConstructor<T> createObjectConstructor(TypeToken<T> type) {
-        return constructorConstructor.get(type);
+        return read(in, TypeToken.of(type));
     }
 
     private static class FutureTypeSerializer<T> implements TypeSerializer<T> {
@@ -256,6 +284,23 @@ public class BlueNBT {
         public T read(NBTReader reader) throws IOException {
             if (this.value == null) throw new IllegalStateException("FutureTypeDeserializer is not ready!");
             return this.value.read(reader);
+        }
+
+    }
+
+    private static class FutureInstanceCreator<T> implements InstanceCreator<T> {
+
+        private InstanceCreator<T> value;
+
+        public void complete(InstanceCreator<T> value) {
+            if (this.value != null) throw new IllegalStateException("FutureObjectConstructor already completed!");
+            this.value = Objects.requireNonNull(value);
+        }
+
+        @Override
+        public T create() {
+            if (this.value == null) throw new IllegalStateException("FutureObjectConstructor is not ready!");
+            return this.value.create();
         }
 
     }

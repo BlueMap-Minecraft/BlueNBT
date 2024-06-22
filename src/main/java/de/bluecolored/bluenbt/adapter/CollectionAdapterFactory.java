@@ -24,13 +24,13 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.lang.reflect.Array;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,21 +41,25 @@ public class CollectionAdapterFactory implements TypeAdapterFactory {
 
     @Override
     public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
-        Type type = typeToken.getType();
+        if (!typeToken.is(Collection.class)) return Optional.empty();
 
-        Class<? super T> rawType = typeToken.getRawType();
-        if (!Collection.class.isAssignableFrom(rawType)) {
-            return Optional.empty();
-        }
-
-        Type elementType = TypeUtil.getCollectionElementType(type, rawType);
-        TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(TypeToken.get(elementType));
-        TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(elementType));
-        ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
+        Type elementType = getCollectionElementType(typeToken);
+        TypeToken<?> elementTypeToken = TypeToken.of(elementType);
+        TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(elementTypeToken);
+        TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(elementTypeToken);
+        InstanceCreator<T> constructor = blueNBT.getInstanceCreator(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         TypeAdapter<T> result = new CollectionAdapter(elementTypeSerializer, elementTypeDeserializer, constructor);
         return Optional.of(result);
+    }
+
+    private Type getCollectionElementType(TypeToken<?> type) {
+        return switch (type.getSupertype(Collection.class)) {
+            case ParameterizedType parameterizedType -> parameterizedType.getActualTypeArguments()[0];
+            case WildcardType wildcardType -> wildcardType.getUpperBounds()[0];
+            default -> Object.class;
+        };
     }
 
     @RequiredArgsConstructor
@@ -63,11 +67,11 @@ public class CollectionAdapterFactory implements TypeAdapterFactory {
 
         private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
-        private final ObjectConstructor<? extends Collection<E>> constructor;
+        private final InstanceCreator<? extends Collection<E>> constructor;
 
         @Override
         public Collection<E> read(NBTReader reader) throws IOException {
-            Collection<E> collection = constructor.construct();
+            Collection<E> collection = constructor.create();
             reader.beginList();
             while (reader.hasNext()) {
                 E instance = typeDeserializer.read(reader);

@@ -24,8 +24,6 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
-
 import java.util.Optional;
 
 public interface TypeAdapterFactory extends TypeSerializerFactory, TypeDeserializerFactory {

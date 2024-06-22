@@ -24,16 +24,11 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
-import de.bluecolored.bluenbt.internal.LinkedTreeMap;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class ObjectAdapterFactory implements TypeDeserializerFactory {
 
@@ -56,7 +51,7 @@ public class ObjectAdapterFactory implements TypeDeserializerFactory {
             switch (type) {
 
                 case COMPOUND:
-                    Map<String, Object> map = new LinkedTreeMap<>();
+                    Map<String, Object> map = new LinkedHashMap<>();
                     reader.beginCompound();
                     while (reader.hasNext())
                         map.put(reader.name(), read(reader));

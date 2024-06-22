@@ -40,11 +40,8 @@ version = lastVersion +
 
 println("Version: $version")
 
-val javaTarget = 11
 java {
-    sourceCompatibility = JavaVersion.toVersion(javaTarget)
-    targetCompatibility = JavaVersion.toVersion(javaTarget)
-
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
     withSourcesJar()
     withJavadocJar()
 }
@@ -59,14 +56,6 @@ repositories {
 dependencies {
     compileOnly ("org.jetbrains:annotations:24.0.1")
     compileOnly ("org.projectlombok:lombok:1.18.32")
-
-    api ("com.google.code.gson:gson")  {
-        version {
-            strictly("[2.8.0,)")
-            prefer("2.8.9")
-        }
-    }
-
     annotationProcessor ("org.projectlombok:lombok:1.18.32")
 
     testImplementation ("com.github.Querz:NBT:4.0")

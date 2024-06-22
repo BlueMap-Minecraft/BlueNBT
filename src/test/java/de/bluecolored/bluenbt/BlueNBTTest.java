@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import net.querz.nbt.mca.CompressionType;
@@ -109,7 +108,7 @@ public class BlueNBTTest {
 
         BlueNBT blueNBT = new BlueNBT();
         try (InputStream in = loadMcaFileChunk(0, 0)) {
-            Chunk chunk = blueNBT.read(in, TypeToken.get(Chunk.class));
+            Chunk chunk = blueNBT.read(in, TypeToken.of(Chunk.class));
 
             assertEquals(25, chunk.getSections().size());
 

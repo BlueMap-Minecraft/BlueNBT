@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -88,7 +87,7 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                     NBTName nbtName = field.getAnnotation(NBTName.class);
                     if (nbtName != null) names = nbtName.value();
 
-                    TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
+                    TypeToken<?> fieldType = TypeToken.of(typeToken.resolve(field.getGenericType()));
 
                     TypeSerializer<?> typeSerializer;
                     Class<? extends TypeSerializer<?>> serializerType = findSerializerType(field, fieldType.getRawType());
@@ -120,8 +119,8 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                         fields.put(name, accessor);
                 }
 
-                Type superType = TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass());
-                typeToken = superType != null ? TypeToken.get(superType) : null;
+                Type superType = typeToken.resolve(raw.getGenericSuperclass());
+                typeToken = superType != null ? TypeToken.of(superType) : null;
             }
         }
 

@@ -24,16 +24,15 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Function;
 
 public class MapAdapterFactory implements TypeAdapterFactory {
@@ -42,18 +41,11 @@ public class MapAdapterFactory implements TypeAdapterFactory {
 
     @Override
     public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
-        Type type = typeToken.getType();
-
-        Class<? super T> rawType = typeToken.getRawType();
-        if (!Map.class.isAssignableFrom(rawType)) {
-            return Optional.empty();
-        }
-
-        Type[] keyAndValueTypes = TypeUtil.getMapKeyAndValueTypes(type, rawType);
+        Type[] keyAndValueTypes = getMapKeyAndValueTypes(typeToken);
 
         Function<?, String> toStringFunction;
         Function<String, ?> fromStringFunction;
-        Class<?> keyType = TypeUtil.getRawType(keyAndValueTypes[0]);
+        Class<?> keyType = TypeToken.of(keyAndValueTypes[0]).getRawType();
         if (String.class.equals(keyType)) {
             toStringFunction = Function.identity();
             fromStringFunction = Function.identity();
@@ -66,11 +58,11 @@ public class MapAdapterFactory implements TypeAdapterFactory {
             return Optional.empty();
         }
 
-        TypeToken<?> valueType = TypeToken.get(keyAndValueTypes[1]);
+        TypeToken<?> valueType = TypeToken.of(keyAndValueTypes[1]);
         TypeSerializer<?> elementTypeSerializer = blueNBT.getTypeSerializer(valueType);
         TypeDeserializer<?> elementTypeDeserializer = blueNBT.getTypeDeserializer(valueType);
 
-        ObjectConstructor<T> constructor = blueNBT.createObjectConstructor(typeToken);
+        InstanceCreator<T> constructor = blueNBT.getInstanceCreator(typeToken);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         TypeAdapter<T> result = new MapAdapter(
@@ -83,6 +75,13 @@ public class MapAdapterFactory implements TypeAdapterFactory {
         return Optional.of(result);
     }
 
+    private Type[] getMapKeyAndValueTypes(TypeToken<?> type) {
+        if (type.is(Properties.class)) return new Type[] { String.class, String.class };
+        return (type.getSupertype(Map.class) instanceof ParameterizedType parameterizedType) ?
+                parameterizedType.getActualTypeArguments() :
+                new Type[] { Object.class, Object.class };
+    }
+
     @RequiredArgsConstructor
     static class MapAdapter<K, E> implements TypeAdapter<Map<K, E>>  {
 
@@ -92,11 +91,11 @@ public class MapAdapterFactory implements TypeAdapterFactory {
         private final TypeSerializer<E> typeSerializer;
         private final TypeDeserializer<E> typeDeserializer;
 
-        private final ObjectConstructor<? extends Map<K, E>> constructor;
+        private final InstanceCreator<? extends Map<K, E>> constructor;
 
         @Override
         public Map<K, E> read(NBTReader reader) throws IOException {
-            Map<K, E> map = constructor.construct();
+            Map<K, E> map = constructor.create();
             reader.beginCompound();
             while (reader.hasNext()) {
                 String keyString = reader.name();
