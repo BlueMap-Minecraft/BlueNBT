@@ -45,7 +45,7 @@ public class TypeToken<T> {
      * You can create any TypeToken instance by creating an anonymous subclass with type-parameters.<br>
      * Like this:
      * <blockquote><pre>
-     *  TypeToken< Map<String, Collection<Integer>> > typeToken = new TypeToken<>() {};
+     *  TypeToken&lt; Map&lt;String, Collection&lt;Integer&gt;&gt; &gt; typeToken = new TypeToken&lt;&gt;() {};
      * </pre></blockquote>
      */
     @SuppressWarnings("unchecked")
@@ -157,7 +157,7 @@ public class TypeToken<T> {
     /**
      * Creates a new TypeToken representing the provided generic type with the specified type-arguments
      * <blockquote><pre>
-     *  // Map<String, Object>
+     *  // Map&lt;String, Object&gt;
      *  TypeToken.of(Map.class, String.class, Object.class)
      * </pre></blockquote>
      */

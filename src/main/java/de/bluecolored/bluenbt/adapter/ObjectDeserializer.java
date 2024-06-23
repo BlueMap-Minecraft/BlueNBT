@@ -35,8 +35,8 @@ import java.util.*;
  * <blockquote><pre>
  *     NBT-Tag -> Deserialized Java-Object
  *     --------------------
- *     COMPOUND -> LinkedHashMap<String, Object>
- *     LIST -> ArrayList<Object>
+ *     COMPOUND -> LinkedHashMap&lt;String, Object&gt;
+ *     LIST -> ArrayList&lt;Object&gt;
  *     STRING -> String
  *     BYTE -> byte
  *     SHORT -> short

@@ -93,7 +93,7 @@ tasks.javadoc {
     options {
         (this as? StandardJavadocDocletOptions)?.apply {
             links(
-                "https://docs.oracle.com/javase/21/docs/api/",
+                "https://docs.oracle.com/en/java/javase/21/docs/api/",
             )
             addStringOption("Xdoclint:none", "-quiet")
             if (JavaVersion.current().isJava9Compatible)

@@ -42,6 +42,7 @@ public class MapAdapterFactory implements TypeAdapterFactory {
 
     public static final MapAdapterFactory INSTANCE = new MapAdapterFactory();
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         Type[] keyAndValueTypes = getMapKeyAndValueTypes(typeToken);
@@ -54,7 +55,6 @@ public class MapAdapterFactory implements TypeAdapterFactory {
             fromStringFunction = Function.identity();
         } else if (Enum.class.isAssignableFrom(keyType)) {
             toStringFunction = (Function<Enum<?>, String>) Enum::name;
-            //noinspection unchecked, rawtypes
             fromStringFunction = (Function<String, Enum>) name -> Enum.valueOf((Class<? extends Enum>) keyAndValueTypes[0], name);
         } else {
             // key-type not supported
