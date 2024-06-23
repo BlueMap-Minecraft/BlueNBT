@@ -64,7 +64,7 @@ Now all you need to do to write all this data to an NBT-file is:
 BlueNBT blueNBT = new BlueNBT();
 try (
         OutputStream out = Files.newOutputStream(Path.of("myFile.nbt"));
-        OutputStream compressedOut = new BufferedOutputStream(new GzipOutputStream(in))
+        OutputStream compressedOut = new BufferedOutputStream(new GzipOutputStream(out))
 ){
     blueNBT.write(myData, compressedOut);
 }
