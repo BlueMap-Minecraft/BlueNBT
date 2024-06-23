@@ -33,15 +33,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BlueNBT {
 
     private final List<TypeSerializerFactory> serializerFactories = new ArrayList<>();
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
     private final List<InstanceCreatorFactory> instanceCreatorFactories = new ArrayList<>();
-    private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new HashMap<>();
-    private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
-    private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new HashMap<>();
+    private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new ConcurrentHashMap<>();
+    private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new ConcurrentHashMap<>();
+    private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new ConcurrentHashMap<>();
 
     @Getter @Setter
     private NamingStrategy namingStrategy = NamingStrategy.FIELD_NAME;
@@ -55,20 +56,21 @@ public class BlueNBT {
         register(MapAdapterFactory.INSTANCE);
     }
 
-    public void register(TypeAdapterFactory typeAdapterFactory) {
+    public synchronized void register(TypeAdapterFactory typeAdapterFactory) {
         serializerFactories.add(typeAdapterFactory);
         deserializerFactories.add(typeAdapterFactory);
+        typeSerializerMap.clear();
     }
 
-    public void register(TypeSerializerFactory typeSerializerFactory) {
+    public synchronized void register(TypeSerializerFactory typeSerializerFactory) {
         serializerFactories.add(typeSerializerFactory);
     }
 
-    public void register(TypeDeserializerFactory typeDeserializerFactory) {
+    public synchronized void register(TypeDeserializerFactory typeDeserializerFactory) {
         deserializerFactories.add(typeDeserializerFactory);
     }
 
-    public void register(InstanceCreatorFactory instanceCreatorFactory) {
+    public synchronized void register(InstanceCreatorFactory instanceCreatorFactory) {
         instanceCreatorFactories.add(instanceCreatorFactory);
     }
 
@@ -120,11 +122,15 @@ public class BlueNBT {
         });
     }
 
+    @SuppressWarnings("unchecked")
     public <T> TypeSerializer<T> getTypeSerializer(TypeToken<T> type) {
-        @SuppressWarnings("unchecked")
         TypeSerializer<T> serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
+        if (serializer != null) return serializer;
 
-        if (serializer == null) {
+        synchronized (this) {
+            serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
+            if (serializer != null ) return serializer;
+
             FutureTypeSerializer<T> future = new FutureTypeSerializer<>();
             typeSerializerMap.put(type, future); // set future before creation of new serializers to avoid recursive creation
 
@@ -144,11 +150,15 @@ public class BlueNBT {
         return serializer;
     }
 
+    @SuppressWarnings("unchecked")
     public <T> TypeDeserializer<T> getTypeDeserializer(TypeToken<T> type) {
-        @SuppressWarnings("unchecked")
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
+        if (deserializer != null) return deserializer;
 
-        if (deserializer == null) {
+        synchronized (this) {
+            deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
+            if (deserializer != null) return deserializer;
+
             FutureTypeDeserializer<T> future = new FutureTypeDeserializer<>();
             typeDeserializerMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
@@ -168,11 +178,15 @@ public class BlueNBT {
         return deserializer;
     }
 
+    @SuppressWarnings("unchecked")
     public <T> InstanceCreator<T> getInstanceCreator(TypeToken<T> type) {
-        @SuppressWarnings("unchecked")
         InstanceCreator<T> instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
+        if (instanceCreator != null) return instanceCreator;
 
-        if (instanceCreator == null) {
+        synchronized (this) {
+            instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
+            if (instanceCreator != null) return instanceCreator;
+
             FutureInstanceCreator<T> future = new FutureInstanceCreator<>();
             instanceCreatorMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
