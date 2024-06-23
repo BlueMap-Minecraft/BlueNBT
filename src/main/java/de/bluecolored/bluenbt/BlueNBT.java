@@ -44,13 +44,7 @@ public class BlueNBT {
     private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new HashMap<>();
 
     @Getter @Setter
-    private FieldNameTransformer fieldNameTransformer = s -> {
-        if (s.isEmpty()) return s;
-        char first = s.charAt(0);
-        if (Character.isUpperCase(first))
-            return Character.toLowerCase(first) + s.substring(1);
-        return s;
-    };
+    private NamingStrategy namingStrategy = NamingStrategy.FIELD_NAME;
 
     public BlueNBT() {
         register(ObjectAdapterFactory.INSTANCE);

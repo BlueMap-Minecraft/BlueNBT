@@ -48,6 +48,8 @@ public class BlueNBTTest {
     public void testBlueNBT() throws IOException {
 
         BlueNBT blueNBT = new BlueNBT();
+        blueNBT.setNamingStrategy(NamingStrategy.UPPER_CAMEL_CASE);
+
         try (InputStream in = NBTReaderTest.class.getResourceAsStream("/level.dat")) {
             assert in != null;
 
@@ -110,6 +112,8 @@ public class BlueNBTTest {
     public void testArrays() throws IOException {
 
         BlueNBT blueNBT = new BlueNBT();
+        blueNBT.setNamingStrategy(NamingStrategy.lowerCaseWithDelimiter("_"));
+
         try (InputStream in = loadMcaFileChunk(0, 0)) {
             Chunk chunk = blueNBT.read(in, TypeToken.of(Chunk.class));
 
@@ -120,10 +124,10 @@ public class BlueNBTTest {
             assertEquals(section.getBlockStates().getPalette().length, 26);
 
             BlockState blockState = section.getBlockStates().getPalette()[6];
-            assertEquals(blockState.getProperties().size(), 7);
-            assertEquals(blockState.getProperties().get("down"), "true");
-            assertEquals(blockState.getProperties().get("east"), "false");
-            assertEquals(blockState.getName(), "minecraft:sculk_vein");
+            assertEquals(7, blockState.getProperties().size());
+            assertEquals("true", blockState.getProperties().get("down"));
+            assertEquals("false", blockState.getProperties().get("east"));
+            assertEquals("minecraft:sculk_vein", blockState.getName());
         }
 
     }
@@ -210,9 +214,10 @@ public class BlueNBTTest {
 
     @Data
     private static class Section {
+        @NBTName("Y")
         private int y;
-        @NBTName("block_states")
         private BlockStates blockStates = new BlockStates();
+        @NBTName("BlockLight")
         private byte[] blockLight = new byte[0];
     }
 
@@ -224,7 +229,9 @@ public class BlueNBTTest {
 
     @Data
     private static class BlockState {
+        @NBTName("Name")
         private String name = "minecraft:air";
+        @NBTName("Properties")
         private Map<String, String> properties = Collections.emptyMap();
     }
 
@@ -245,6 +252,7 @@ public class BlueNBTTest {
     private static class DataTagSuper {
         private int difficulty;
         private boolean difficultyLocked;
+        @NBTName("rainTime")
         private int rainTime;
     }
 

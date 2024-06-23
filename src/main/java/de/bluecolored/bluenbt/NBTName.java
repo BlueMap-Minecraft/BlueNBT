@@ -33,6 +33,11 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 public @interface NBTName {
 
+    /**
+     * Defines one or more nbt-names for the annotated field.<br>
+     * All names of the list will be considered during deserialization, but only the first name will be used for
+     * serialization.
+     */
     String[] value();
 
 }

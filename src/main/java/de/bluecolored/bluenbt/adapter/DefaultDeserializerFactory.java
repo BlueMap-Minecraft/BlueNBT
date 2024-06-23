@@ -65,7 +65,6 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
         private final TypeToken<T> type;
         private final InstanceCreator<T> constructor;
-        private final BlueNBT blueNBT;
 
         private final Map<String, FieldAccessor> fields = new HashMap<>();
 
@@ -74,7 +73,6 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
         public DefaultAdapter(TypeToken<T> type, InstanceCreator<T> constructor, BlueNBT blueNBT) {
             this.type = type;
             this.constructor = constructor;
-            this.blueNBT = blueNBT;
 
             TypeToken<?> typeToken = type;
             Class<?> raw;
@@ -86,9 +84,9 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
                     field.setAccessible(true);
 
-                    String[] names = new String[]{ field.getName() };
+                    String[] names = new String[]{ blueNBT.getNamingStrategy().apply(field) };
                     NBTName nbtName = field.getAnnotation(NBTName.class);
-                    if (nbtName != null) names = nbtName.value();
+                    if (nbtName != null && nbtName.value().length > 0) names = nbtName.value();
 
                     TypeToken<?> fieldType = TypeToken.of(typeToken.resolve(field.getGenericType()));
 
@@ -139,11 +137,6 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                 while (reader.peek() != TagType.END) {
                     String name = reader.name();
                     FieldAccessor fieldInfo = fields.get(name);
-
-                    if (fieldInfo == null) {
-                        name = blueNBT.getFieldNameTransformer().apply(name);
-                        fieldInfo = fields.get(name);
-                    }
 
                     if (fieldInfo != null) {
                         fieldInfo.read(object, reader);

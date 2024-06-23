@@ -83,9 +83,9 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
 
                     field.setAccessible(true);
 
-                    String[] names = new String[]{ field.getName() };
+                    String name = blueNBT.getNamingStrategy().apply(field);
                     NBTName nbtName = field.getAnnotation(NBTName.class);
-                    if (nbtName != null) names = nbtName.value();
+                    if (nbtName != null && nbtName.value().length > 0) name = nbtName.value()[0];
 
                     TypeToken<?> fieldType = TypeToken.of(typeToken.resolve(field.getGenericType()));
 
@@ -107,16 +107,14 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                         });
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldWriter accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
-                        for (String name : names)
-                            fields.put(name, accessor);
+                        fields.put(name, accessor);
                         continue;
                     } else {
                         typeSerializer = blueNBT.getTypeSerializer(fieldType);
                     }
 
                     FieldWriter accessor = new TypeSerializerFieldWriter<>(field, typeSerializer);
-                    for (String name : names)
-                        fields.put(name, accessor);
+                    fields.put(name, accessor);
                 }
 
                 Type superType = typeToken.resolve(raw.getGenericSuperclass());
