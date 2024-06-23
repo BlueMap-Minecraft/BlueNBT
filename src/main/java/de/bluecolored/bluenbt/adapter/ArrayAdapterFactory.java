@@ -24,34 +24,32 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
+import de.bluecolored.bluenbt.TypeToken;
 import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
-import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.Type;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * A {@link TypeAdapterFactory} creating {@link TypeAdapter}s for any Array-Type
+ */
 public class ArrayAdapterFactory implements TypeAdapterFactory {
 
     public static final ArrayAdapterFactory INSTANCE = new ArrayAdapterFactory();
 
     @Override
     public <T> Optional<TypeAdapter<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
-        Type type = typeToken.getType();
-        if (!(type instanceof GenericArrayType || type instanceof Class && ((Class<?>) type).isArray())) {
-            return Optional.empty();
-        }
+        if (!typeToken.isArray()) return Optional.empty();
 
-        Type componentType = TypeUtil.getArrayComponentType(type);
-        TypeSerializer<?> componentTypeSerializer = blueNBT.getTypeSerializer(TypeToken.get(componentType));
-        TypeDeserializer<?> componentTypeDeserializer = blueNBT.getTypeDeserializer(TypeToken.get(componentType));
+        TypeToken<?> componentType = TypeToken.of(typeToken.getComponentType());
+        TypeSerializer<?> componentTypeSerializer = blueNBT.getTypeSerializer(componentType);
+        TypeDeserializer<?> componentTypeDeserializer = blueNBT.getTypeDeserializer(componentType);
 
         @SuppressWarnings({"unchecked", "rawtypes"})
-        TypeAdapter<T> result = new ArrayAdapter(TypeUtil.getRawType(componentType), componentTypeSerializer, componentTypeDeserializer);
+        TypeAdapter<T> result = new ArrayAdapter(componentType.getRawType(), componentTypeSerializer, componentTypeDeserializer);
         return Optional.of(result);
     }
 
@@ -95,35 +93,32 @@ public class ArrayAdapterFactory implements TypeAdapterFactory {
         @Override
         @SuppressWarnings("unchecked")
         public void write(Object value, NBTWriter writer) throws IOException {
-            if (value instanceof byte[])
-                writer.value((byte[]) value);
-
-            else if (value instanceof int[])
-                writer.value((int[]) value);
-
-            else if (value instanceof long[])
-                writer.value((long[]) value);
-
-            else {
-                int length = Array.getLength(value);
-                if (length == 0) {
-                    writer.beginList(length, typeSerializer.type());
-                    writer.endList();
-                } else {
-                    writer.beginList(length);
-                    for (int i = 0; i < length; i++) {
-                        typeSerializer.write(
-                                Objects.requireNonNull((E) Array.get(value, i), "'null' values are not supported in a list."),
-                                writer
-                        );
+            switch (value) {
+                case byte[] bytes -> writer.value(bytes);
+                case int[] ints -> writer.value(ints);
+                case long[] longs -> writer.value(longs);
+                default -> {
+                    int length = Array.getLength(value);
+                    if (length == 0) {
+                        writer.beginList(length, typeSerializer.type());
+                        writer.endList();
+                    } else {
+                        writer.beginList(length);
+                        for (int i = 0; i < length; i++) {
+                            typeSerializer.write(
+                                    Objects.requireNonNull((E) Array.get(value, i), "'null' values are not supported in a list."),
+                                    writer
+                            );
+                        }
+                        writer.endList();
                     }
-                    writer.endList();
                 }
             }
         }
 
         @Override
         public TagType type() {
+            //noinspection IfCanBeSwitch
             if (type.equals(byte.class)) return TagType.BYTE_ARRAY;
             if (type.equals(int.class)) return TagType.INT_ARRAY;
             if (type.equals(long.class)) return TagType.LONG_ARRAY;

@@ -29,10 +29,19 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Use this annotation on any field or class definition to set a specific {@link TypeAdapter} that should be used
+ * when (de)serializing this field or type.
+ * <p>Field-annotations have a higher priority than class-annotations.</p>
+ * <p>{@link NBTSerializer} or {@link NBTDeserializer} have a higher priority than {@link NBTAdapter} annotations.</p>
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.FIELD})
 public @interface NBTAdapter {
 
+    /**
+     * The {@link TypeAdapter} that should be used for (de)serialization
+     */
     Class<? extends TypeAdapter<?>> value();
 
 }

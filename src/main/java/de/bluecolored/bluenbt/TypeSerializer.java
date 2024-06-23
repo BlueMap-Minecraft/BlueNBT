@@ -26,9 +26,15 @@ package de.bluecolored.bluenbt;
 
 import java.io.IOException;
 
+/**
+ * A TypeSerializer is able to serialize and write a certain type T to an {@link NBTWriter}
+ */
 @FunctionalInterface
 public interface TypeSerializer<T> {
 
+    /**
+     * Serializes and writes the provided value to the given writer
+     */
     void write(T value, NBTWriter writer) throws IOException;
 
     /**

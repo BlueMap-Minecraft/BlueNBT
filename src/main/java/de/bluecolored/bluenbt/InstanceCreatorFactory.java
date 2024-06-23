@@ -24,6 +24,21 @@
  */
 package de.bluecolored.bluenbt;
 
-public interface ObjectConstructor<T> {
-    T construct();
+import java.util.Optional;
+
+/**
+ * A factory for creating {@link InstanceCreator}s
+ */
+@FunctionalInterface
+public interface InstanceCreatorFactory {
+
+    /**
+     * Attempts to create and return an {@link InstanceCreator} for the given type, returning an empty {@link Optional} if the type
+     * is not supported by this factory.
+     * @param type The type the new {@link InstanceCreator} should be able to produce
+     * @param blueNBT The currently used BlueNBT-instance
+     * @return An {@link Optional} with the {@link InstanceCreator} or an empty Optional if the type is not supported
+     */
+    <T> Optional<? extends InstanceCreator<T>> create(TypeToken<T> type, BlueNBT blueNBT);
+
 }

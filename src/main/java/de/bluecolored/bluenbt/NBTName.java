@@ -29,10 +29,19 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Defines one or more fixed nbt-names for the annotated field.<br>
+ * All names of the list will be considered during deserialization, but only the first name will be used for
+ * serialization.
+ * <p>The defined names will ignore any configured {@link NamingStrategy}s.</p>
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})
 public @interface NBTName {
 
+    /**
+     * The name(s) that should be used for (de)serialization
+     */
     String[] value();
 
 }

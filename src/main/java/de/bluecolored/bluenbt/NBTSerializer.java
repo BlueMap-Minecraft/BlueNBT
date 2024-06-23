@@ -29,10 +29,19 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Use this annotation on any field or class definition to set a specific {@link TypeSerializer} that should be used
+ * when serializing this field or type.
+ * <p>Field-annotations have a higher priority than class-annotations.</p>
+ * <p>{@link NBTSerializer} has a higher priority than {@link NBTAdapter} annotations.</p>
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.FIELD})
 public @interface NBTSerializer {
 
+    /**
+     * The {@link TypeSerializer} that should be used for serialization
+     */
     Class<? extends TypeSerializer<?>> value();
 
 }

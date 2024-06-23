@@ -24,13 +24,21 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
-
 import java.util.Optional;
 
+/**
+ * A factory for creating {@link TypeDeserializer}s
+ */
 @FunctionalInterface
 public interface TypeDeserializerFactory {
 
+    /**
+     * Attempts to create and return a {@link TypeDeserializer} for the given type, returning an empty {@link Optional} if the type
+     * is not supported by this factory.
+     * @param type The type the new {@link TypeDeserializer} should be able to deserialize
+     * @param blueNBT The currently used BlueNBT-instance
+     * @return An {@link Optional} with the {@link TypeDeserializer} or an empty Optional if the type is not supported
+     */
     <T> Optional<? extends TypeDeserializer<T>> create(TypeToken<T> type, BlueNBT blueNBT);
 
 }

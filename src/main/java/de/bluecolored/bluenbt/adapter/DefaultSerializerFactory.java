@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +37,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+/**
+ * A {@link TypeSerializerFactory} attempting to create {@link TypeSerializer}s for any type based on the types fields using reflection.
+ */
 public class DefaultSerializerFactory implements TypeSerializerFactory {
 
     public static final DefaultSerializerFactory INSTANCE = new DefaultSerializerFactory();
@@ -84,11 +86,11 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
 
                     field.setAccessible(true);
 
-                    String[] names = new String[]{ field.getName() };
+                    String name = blueNBT.getNamingStrategy().apply(field);
                     NBTName nbtName = field.getAnnotation(NBTName.class);
-                    if (nbtName != null) names = nbtName.value();
+                    if (nbtName != null && nbtName.value().length > 0) name = nbtName.value()[0];
 
-                    TypeToken<?> fieldType = TypeToken.get(TypeUtil.resolve(typeToken.getType(), raw, field.getGenericType()));
+                    TypeToken<?> fieldType = TypeToken.of(typeToken.resolve(field.getGenericType()));
 
                     TypeSerializer<?> typeSerializer;
                     Class<? extends TypeSerializer<?>> serializerType = findSerializerType(field, fieldType.getRawType());
@@ -108,20 +110,18 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                         });
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldWriter accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
-                        for (String name : names)
-                            fields.put(name, accessor);
+                        fields.put(name, accessor);
                         continue;
                     } else {
                         typeSerializer = blueNBT.getTypeSerializer(fieldType);
                     }
 
                     FieldWriter accessor = new TypeSerializerFieldWriter<>(field, typeSerializer);
-                    for (String name : names)
-                        fields.put(name, accessor);
+                    fields.put(name, accessor);
                 }
 
-                Type superType = TypeUtil.resolve(typeToken.getType(), raw, raw.getGenericSuperclass());
-                typeToken = superType != null ? TypeToken.get(superType) : null;
+                Type superType = typeToken.resolve(raw.getGenericSuperclass());
+                typeToken = superType != null ? TypeToken.of(superType) : null;
             }
         }
 

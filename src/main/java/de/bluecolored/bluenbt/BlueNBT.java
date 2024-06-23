@@ -24,10 +24,7 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.InstanceCreator;
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.adapter.*;
-import de.bluecolored.bluenbt.internal.ConstructorConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -36,28 +33,35 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * The heart of BlueNBT.
+ * <p>Use this class to register your {@link TypeSerializer}s, {@link TypeDeserializer}s and {@link InstanceCreator}s and
+ * (de)serialize any object to/from NBT.</p>
+ */
 public class BlueNBT {
 
     private final List<TypeSerializerFactory> serializerFactories = new ArrayList<>();
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
-    private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new HashMap<>();
-    private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new HashMap<>();
-    private final Map<Type, InstanceCreator<?>> instanceCreators = new HashMap<>();
+    private final List<InstanceCreatorFactory> instanceCreatorFactories = new ArrayList<>();
+    private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new ConcurrentHashMap<>();
+    private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new ConcurrentHashMap<>();
+    private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new ConcurrentHashMap<>();
 
-    private final ConstructorConstructor constructorConstructor = new ConstructorConstructor(instanceCreators);
-
+    /**
+     * The {@link NamingStrategy} this BlueNBT instance uses to determine the NBT-name
+     * from a given {@link java.lang.reflect.Field}.
+     * <p>Defaults to {@link NamingStrategy#FIELD_NAME}</p>
+     */
     @Getter @Setter
-    private FieldNameTransformer fieldNameTransformer = s -> {
-        if (s.isEmpty()) return s;
-        char first = s.charAt(0);
-        if (Character.isUpperCase(first))
-            return Character.toLowerCase(first) + s.substring(1);
-        return s;
-    };
+    private NamingStrategy namingStrategy = NamingStrategy.FIELD_NAME;
 
+    /**
+     * Creates a fresh BlueNBT instance with the default configuration and default (de)serializers.
+     */
     public BlueNBT() {
-        register(ObjectAdapterFactory.INSTANCE);
+        register(TypeToken.of(Object.class), ObjectDeserializer.INSTANCE);
         register(ArrayAdapterFactory.INSTANCE);
         register(PrimitiveSerializerFactory.INSTANCE);
         register(PrimitiveDeserializerFactory.INSTANCE);
@@ -65,19 +69,39 @@ public class BlueNBT {
         register(MapAdapterFactory.INSTANCE);
     }
 
-    public void register(TypeAdapterFactory typeAdapterFactory) {
+    /**
+     * Registers a {@link TypeAdapterFactory} for this BlueNBT instance to use for (de)serialization.
+     */
+    public synchronized void register(TypeAdapterFactory typeAdapterFactory) {
         serializerFactories.add(typeAdapterFactory);
         deserializerFactories.add(typeAdapterFactory);
+        typeSerializerMap.clear();
     }
 
-    public void register(TypeSerializerFactory typeSerializerFactory) {
+    /**
+     * Registers a {@link TypeSerializerFactory} for this BlueNBT instance to use for serialization.
+     */
+    public synchronized void register(TypeSerializerFactory typeSerializerFactory) {
         serializerFactories.add(typeSerializerFactory);
     }
 
-    public void register(TypeDeserializerFactory typeDeserializerFactory) {
+    /**
+     * Registers a {@link TypeDeserializerFactory} for this BlueNBT instance to use for deserialization.
+     */
+    public synchronized void register(TypeDeserializerFactory typeDeserializerFactory) {
         deserializerFactories.add(typeDeserializerFactory);
     }
 
+    /**
+     * Registers a {@link InstanceCreatorFactory} for this BlueNBT instance to use for instance-creation.
+     */
+    public synchronized void register(InstanceCreatorFactory instanceCreatorFactory) {
+        instanceCreatorFactories.add(instanceCreatorFactory);
+    }
+
+    /**
+     * Registers a {@link TypeAdapter} for this BlueNBT instance to use for (de)serialization of the specified type.
+     */
     public <T> void register(TypeToken<T> type, TypeAdapter<T> typeAdapter) {
         register(new TypeAdapterFactory() {
             @Override
@@ -90,6 +114,9 @@ public class BlueNBT {
         });
     }
 
+    /**
+     * Registers a {@link TypeSerializer} for this BlueNBT instance to use for serialization of the specified type.
+     */
     public <T> void register(TypeToken<T> type, TypeSerializer<T> typeSerializer) {
         register(new TypeSerializerFactory() {
             @Override
@@ -102,6 +129,9 @@ public class BlueNBT {
         });
     }
 
+    /**
+     * Registers a {@link TypeDeserializer} for this BlueNBT instance to use for deserialization of the specified type.
+     */
     public <T> void register(TypeToken<T> type, TypeDeserializer<T> typeDeserializer) {
         register(new TypeDeserializerFactory() {
             @Override
@@ -114,15 +144,33 @@ public class BlueNBT {
         });
     }
 
-    public <T> void register(Type type, InstanceCreator<T> instanceCreator) {
-        this.instanceCreators.put(type, instanceCreator);
+    /**
+     * Registers a {@link InstanceCreator} for this BlueNBT instance to use for instance-creation of the specified type.
+     */
+    public <T> void register(TypeToken<T> type, InstanceCreator<T> instanceCreator) {
+        register(new InstanceCreatorFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <U> Optional<? extends InstanceCreator<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
+                if (createType.equals(type))
+                    return Optional.of((InstanceCreator<U>) instanceCreator);
+                return Optional.empty();
+            }
+        });
     }
 
+    /**
+     * Returns the {@link TypeSerializer} for the given type
+     */
+    @SuppressWarnings("unchecked")
     public <T> TypeSerializer<T> getTypeSerializer(TypeToken<T> type) {
-        @SuppressWarnings("unchecked")
         TypeSerializer<T> serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
+        if (serializer != null) return serializer;
 
-        if (serializer == null) {
+        synchronized (this) {
+            serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
+            if (serializer != null ) return serializer;
+
             FutureTypeSerializer<T> future = new FutureTypeSerializer<>();
             typeSerializerMap.put(type, future); // set future before creation of new serializers to avoid recursive creation
 
@@ -142,11 +190,18 @@ public class BlueNBT {
         return serializer;
     }
 
+    /**
+     * Returns the {@link TypeDeserializer} for the given type
+     */
+    @SuppressWarnings("unchecked")
     public <T> TypeDeserializer<T> getTypeDeserializer(TypeToken<T> type) {
-        @SuppressWarnings("unchecked")
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
+        if (deserializer != null) return deserializer;
 
-        if (deserializer == null) {
+        synchronized (this) {
+            deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
+            if (deserializer != null) return deserializer;
+
             FutureTypeDeserializer<T> future = new FutureTypeDeserializer<>();
             typeDeserializerMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
@@ -166,58 +221,171 @@ public class BlueNBT {
         return deserializer;
     }
 
+    /**
+     * Returns the {@link InstanceCreator} for the given type
+     */
+    @SuppressWarnings("unchecked")
+    public <T> InstanceCreator<T> getInstanceCreator(TypeToken<T> type) {
+        InstanceCreator<T> instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
+        if (instanceCreator != null) return instanceCreator;
+
+        synchronized (this) {
+            instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
+            if (instanceCreator != null) return instanceCreator;
+
+            FutureInstanceCreator<T> future = new FutureInstanceCreator<>();
+            instanceCreatorMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+
+            for (int i = instanceCreatorFactories.size() - 1; i >= 0; i--) {
+                InstanceCreatorFactory factory = instanceCreatorFactories.get(i);
+                instanceCreator = factory.create(type, this).orElse(null);
+                if (instanceCreator != null) break;
+            }
+
+            if (instanceCreator == null)
+                instanceCreator = DefaultInstanceCreatorFactory.INSTANCE.createFor(type, this);
+
+            future.complete(instanceCreator);
+            instanceCreatorMap.put(type, instanceCreator);
+        }
+
+        return instanceCreator;
+    }
+
+    /**
+     * Serializes an object to NBT using the specified type for serialization, and writes it to the given
+     * {@link OutputStream}
+     * @param object The Object that should be serialized
+     * @param out The {@link OutputStream} to write the data to
+     * @param type The type that should be used during serialization
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> void write(T object, OutputStream out, TypeToken<T> type) throws IOException {
         write(object, new NBTWriter(out), type);
     }
 
+    /**
+     * Serializes an object to NBT using the specified type for serialization, and writes it to the given
+     * {@link NBTWriter}
+     * @param object The Object that should be serialized
+     * @param out The {@link NBTWriter} to write the data to
+     * @param type The type that should be used during serialization
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> void write(T object, NBTWriter out, TypeToken<T> type) throws IOException {
         getTypeSerializer(type).write(object, out);
     }
 
+    /**
+     * Serializes an object to NBT using the specified {@link Class} for serialization, and writes it to the given
+     * {@link OutputStream}
+     * @param object The Object that should be serialized
+     * @param out The {@link OutputStream} to write the data to
+     * @param type The {@link Class} that should be used during serialization
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> void write(T object, OutputStream out, Class<T> type) throws IOException {
-        write(object, out, TypeToken.get(type));
+        write(object, out, TypeToken.of(type));
     }
 
+    /**
+     * Serializes an object to NBT using the specified {@link Class} for serialization, and writes it to the given
+     * {@link NBTWriter}
+     * @param object The Object that should be serialized
+     * @param out The {@link NBTWriter} to write the data to
+     * @param type The {@link Class} that should be used during serialization
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> void write(T object, NBTWriter out, Class<T> type) throws IOException {
-        write(object, out, TypeToken.get(type));
+        write(object, out, TypeToken.of(type));
     }
 
+    /**
+     * Serializes an object to NBT and writes it to the given {@link OutputStream}
+     * @param object The Object that should be serialized
+     * @param out The {@link OutputStream} to write the data to
+     * @throws IOException If an {@link IOException} occurred
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void write(Object object, OutputStream out) throws IOException {
         write(object, out, (Class) object.getClass());
     }
 
+    /**
+     * Serializes an object to NBT and writes it to the given {@link NBTWriter}
+     * @param object The Object that should be serialized
+     * @param out The {@link NBTWriter} to write the data to
+     * @throws IOException If an {@link IOException} occurred
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void write(Object object, NBTWriter out) throws IOException {
         write(object, out, (Class) object.getClass());
     }
 
+    /**
+     * Reads an object from the given {@link InputStream} and deserializes it from NBT to the given type.
+     * @param in The {@link InputStream} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> T read(InputStream in, TypeToken<T> type) throws IOException {
         return read(new NBTReader(in), type);
     }
 
+    /**
+     * Reads an object from the given {@link NBTReader} and deserializes it from NBT to the given type.
+     * @param in The {@link NBTReader} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> T read(NBTReader in, TypeToken<T> type) throws IOException {
         return getTypeDeserializer(type).read(in);
     }
 
+    /**
+     * Reads an object from the given {@link InputStream} and deserializes it from NBT to the given type.
+     * @param in The {@link InputStream} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> T read(InputStream in, Class<T> type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
+    /**
+     * Reads an object from the given {@link NBTReader} and deserializes it from NBT to the given type.
+     * @param in The {@link NBTReader} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public <T> T read(NBTReader in, Class<T> type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
+    /**
+     * Reads an object from the given {@link InputStream} and deserializes it from NBT to the given type.
+     * @param in The {@link InputStream} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public Object read(InputStream in, Type type) throws IOException {
-        return read(in, TypeToken.get(type));
+        return read(in, TypeToken.of(type));
     }
 
+    /**
+     * Reads an object from the given {@link NBTReader} and deserializes it from NBT to the given type.
+     * @param in The {@link NBTReader} to read from
+     * @param type The type of the object
+     * @return The deserialized object
+     * @throws IOException If an {@link IOException} occurred
+     */
     public Object read(NBTReader in, Type type) throws IOException {
-        return read(in, TypeToken.get(type));
-    }
-
-    public <T> ObjectConstructor<T> createObjectConstructor(TypeToken<T> type) {
-        return constructorConstructor.get(type);
+        return read(in, TypeToken.of(type));
     }
 
     private static class FutureTypeSerializer<T> implements TypeSerializer<T> {
@@ -256,6 +424,23 @@ public class BlueNBT {
         public T read(NBTReader reader) throws IOException {
             if (this.value == null) throw new IllegalStateException("FutureTypeDeserializer is not ready!");
             return this.value.read(reader);
+        }
+
+    }
+
+    private static class FutureInstanceCreator<T> implements InstanceCreator<T> {
+
+        private InstanceCreator<T> value;
+
+        public void complete(InstanceCreator<T> value) {
+            if (this.value != null) throw new IllegalStateException("FutureObjectConstructor already completed!");
+            this.value = Objects.requireNonNull(value);
+        }
+
+        @Override
+        public T create() {
+            if (this.value == null) throw new IllegalStateException("FutureObjectConstructor is not ready!");
+            return this.value.create();
         }
 
     }

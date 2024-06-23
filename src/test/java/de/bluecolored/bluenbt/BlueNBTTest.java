@@ -24,18 +24,20 @@
  */
 package de.bluecolored.bluenbt;
 
-import com.google.gson.reflect.TypeToken;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import net.querz.nbt.mca.CompressionType;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,6 +48,8 @@ public class BlueNBTTest {
     public void testBlueNBT() throws IOException {
 
         BlueNBT blueNBT = new BlueNBT();
+        blueNBT.setNamingStrategy(NamingStrategy.UPPER_CAMEL_CASE);
+
         try (InputStream in = NBTReaderTest.class.getResourceAsStream("/level.dat")) {
             assert in != null;
 
@@ -108,8 +112,10 @@ public class BlueNBTTest {
     public void testArrays() throws IOException {
 
         BlueNBT blueNBT = new BlueNBT();
+        blueNBT.setNamingStrategy(NamingStrategy.lowerCaseWithDelimiter("_"));
+
         try (InputStream in = loadMcaFileChunk(0, 0)) {
-            Chunk chunk = blueNBT.read(in, TypeToken.get(Chunk.class));
+            Chunk chunk = blueNBT.read(in, TypeToken.of(Chunk.class));
 
             assertEquals(25, chunk.getSections().size());
 
@@ -118,10 +124,10 @@ public class BlueNBTTest {
             assertEquals(section.getBlockStates().getPalette().length, 26);
 
             BlockState blockState = section.getBlockStates().getPalette()[6];
-            assertEquals(blockState.getProperties().size(), 7);
-            assertEquals(blockState.getProperties().get("down"), "true");
-            assertEquals(blockState.getProperties().get("east"), "false");
-            assertEquals(blockState.getName(), "minecraft:sculk_vein");
+            assertEquals(7, blockState.getProperties().size());
+            assertEquals("true", blockState.getProperties().get("down"));
+            assertEquals("false", blockState.getProperties().get("east"));
+            assertEquals("minecraft:sculk_vein", blockState.getName());
         }
 
     }
@@ -173,13 +179,9 @@ public class BlueNBTTest {
 
         raf.seek(offset + 4); // +4 skip chunk size
 
-        byte compressionTypeByte = raf.readByte();
-        CompressionType compressionType = CompressionType.getFromID(compressionTypeByte);
-        if (compressionType == null) {
-            throw new IOException("Invalid compression type " + compressionTypeByte);
-        }
+        assert raf.readByte() == 2; // compression byte (2 => deflate-compressed)
 
-        return compressionType.decompress(new FileInputStream(raf.getFD()));
+        return new InflaterInputStream(new FileInputStream(raf.getFD()));
     }
 
     private enum TestEnum {
@@ -212,9 +214,10 @@ public class BlueNBTTest {
 
     @Data
     private static class Section {
+        @NBTName("Y")
         private int y;
-        @NBTName("block_states")
         private BlockStates blockStates = new BlockStates();
+        @NBTName("BlockLight")
         private byte[] blockLight = new byte[0];
     }
 
@@ -226,7 +229,9 @@ public class BlueNBTTest {
 
     @Data
     private static class BlockState {
+        @NBTName("Name")
         private String name = "minecraft:air";
+        @NBTName("Properties")
         private Map<String, String> properties = Collections.emptyMap();
     }
 
@@ -247,6 +252,7 @@ public class BlueNBTTest {
     private static class DataTagSuper {
         private int difficulty;
         private boolean difficultyLocked;
+        @NBTName("rainTime")
         private int rainTime;
     }
 

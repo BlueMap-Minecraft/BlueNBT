@@ -24,4 +24,7 @@
  */
 package de.bluecolored.bluenbt;
 
+/**
+ * A TypeAdapter combines a {@link TypeSerializer} and a {@link TypeDeserializer} for a certain type T
+ */
 public interface TypeAdapter<T> extends TypeSerializer<T>, TypeDeserializer<T> {}

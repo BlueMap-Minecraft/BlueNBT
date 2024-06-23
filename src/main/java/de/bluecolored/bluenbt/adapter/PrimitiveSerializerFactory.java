@@ -24,7 +24,6 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import com.google.gson.reflect.TypeToken;
 import de.bluecolored.bluenbt.*;
 
 import java.io.IOException;
@@ -33,6 +32,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * A {@link TypeSerializerFactory} creating {@link TypeSerializer}s for any primitive type and {@link String}s
+ */
 public class PrimitiveSerializerFactory implements TypeSerializerFactory {
 
     public static final PrimitiveSerializerFactory INSTANCE = new PrimitiveSerializerFactory();
@@ -71,11 +73,7 @@ public class PrimitiveSerializerFactory implements TypeSerializerFactory {
     @SuppressWarnings("unchecked")
     public <T> Optional<TypeSerializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         TypeSerializer<?> typeSerializer = TYPE_SERIALIZER_MAP.get(typeToken.getRawType());
-
-        if (typeSerializer != null)
-            return Optional.of((TypeSerializer<T>) typeSerializer);
-
-        return Optional.empty();
+        return Optional.ofNullable((TypeSerializer<T>) typeSerializer);
     }
 
     public static void writeBool(boolean value, NBTWriter writer) throws IOException {
