@@ -79,6 +79,8 @@ try (
     MyData myData = blueNBT.read(compressedIn, MyData.class);
 }
 ```
-Note that both times we GZIP(De)Compressed our streams before writing/reading. This is because usually all nbt-files are
-GZIP-Compressed, BlueNBT does **not** do this for us to allow more flexibility.  
-Also, make sure to use buffered streams before (de)compression to greatly improve compression-performance.
+
+> [!NOTE]
+> Both times we GZIP(De)Compressed our streams before writing/reading. This is because usually all nbt-files are
+> GZIP-Compressed, BlueNBT does **not** do this for us to allow more flexibility.  
+> Also, make sure to use buffered streams before (de)compression to greatly improve compression-performance.
