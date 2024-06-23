@@ -26,15 +26,18 @@ package de.bluecolored.bluenbt;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import net.querz.nbt.mca.CompressionType;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -172,13 +175,9 @@ public class BlueNBTTest {
 
         raf.seek(offset + 4); // +4 skip chunk size
 
-        byte compressionTypeByte = raf.readByte();
-        CompressionType compressionType = CompressionType.getFromID(compressionTypeByte);
-        if (compressionType == null) {
-            throw new IOException("Invalid compression type " + compressionTypeByte);
-        }
+        assert raf.readByte() == 2; // compression byte (2 => deflate-compressed)
 
-        return compressionType.decompress(new FileInputStream(raf.getFD()));
+        return new InflaterInputStream(new FileInputStream(raf.getFD()));
     }
 
     private enum TestEnum {

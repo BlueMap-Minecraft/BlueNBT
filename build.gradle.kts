@@ -14,15 +14,12 @@ fun String.runCommand(): String = ProcessBuilder(split("\\s(?=(?:[^'\"`]*(['\"`]
     .redirectError(ProcessBuilder.Redirect.PIPE)
     .start()
     .apply {
-        if (!waitFor(10, TimeUnit.SECONDS)) {
+        if (!waitFor(10, TimeUnit.SECONDS))
             throw TimeoutException("Failed to execute command: '" + this@runCommand + "'")
-        }
     }
     .run {
         val error = errorStream.bufferedReader().readText().trim()
-        if (error.isNotEmpty()) {
-            throw IOException(error)
-        }
+        if (error.isNotEmpty()) throw IOException(error)
         inputStream.bufferedReader().readText().trim()
     }
 
@@ -48,9 +45,6 @@ java {
 
 repositories {
     mavenCentral()
-    maven {
-        setUrl("https://jitpack.io")
-    }
 }
 
 dependencies {
@@ -58,7 +52,6 @@ dependencies {
     compileOnly ("org.projectlombok:lombok:1.18.32")
     annotationProcessor ("org.projectlombok:lombok:1.18.32")
 
-    testImplementation ("com.github.Querz:NBT:4.0")
     testImplementation ("org.junit.jupiter:junit-jupiter-api:5.9.2")
     testRuntimeOnly ("org.junit.jupiter:junit-jupiter-engine:5.9.2")
     testCompileOnly ("org.projectlombok:lombok:1.18.32")
@@ -72,13 +65,6 @@ tasks.getByName<Test>("test") {
 spotless {
     java {
         target ("src/*/java/**/*.java")
-        targetExclude(
-            "**/internal/ConstructorConstructor.java",
-            "**/internal/LinkedTreeMap.java",
-            "**/internal/UnsafeAllocator.java",
-            "**/adapter/TypeUtil.java",
-        )
-
         licenseHeaderFile("LICENSE_HEADER")
         indentWithSpaces()
         trimTrailingWhitespace()
@@ -107,8 +93,7 @@ tasks.javadoc {
     options {
         (this as? StandardJavadocDocletOptions)?.apply {
             links(
-                "https://docs.oracle.com/javase/8/docs/api/",
-                "https://javadoc.io/doc/com.google.code.gson/gson/2.8.0/",
+                "https://docs.oracle.com/javase/21/docs/api/",
             )
             addStringOption("Xdoclint:none", "-quiet")
             if (JavaVersion.current().isJava9Compatible)
