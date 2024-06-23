@@ -35,6 +35,9 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * A {@link TypeAdapterFactory} creating {@link TypeAdapter}s for any Collection-Type
+ */
 public class CollectionAdapterFactory implements TypeAdapterFactory {
 
     public static final CollectionAdapterFactory INSTANCE = new CollectionAdapterFactory();

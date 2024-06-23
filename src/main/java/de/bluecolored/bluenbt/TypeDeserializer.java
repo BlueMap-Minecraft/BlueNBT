@@ -26,9 +26,15 @@ package de.bluecolored.bluenbt;
 
 import java.io.IOException;
 
+/**
+ * A TypeDeserializer is able to read and deserialize a certain type T from an {@link NBTReader}
+ */
 @FunctionalInterface
 public interface TypeDeserializer<T> {
 
+    /**
+     * Reads and returns T from the given reader
+     */
     T read(NBTReader reader) throws IOException;
 
 }

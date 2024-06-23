@@ -35,6 +35,9 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Function;
 
+/**
+ * A {@link TypeAdapterFactory} creating {@link TypeAdapter}s for any Map-Type
+ */
 public class MapAdapterFactory implements TypeAdapterFactory {
 
     public static final MapAdapterFactory INSTANCE = new MapAdapterFactory();

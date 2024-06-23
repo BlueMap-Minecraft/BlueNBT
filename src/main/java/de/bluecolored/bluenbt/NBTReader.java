@@ -33,6 +33,9 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.IntFunction;
 
+/**
+ * Can be used to directly read raw nbt-data from any {@link InputStream}.
+ */
 public class NBTReader implements Closeable {
     private static final String UNKNOWN_NAME = "<unknown>";
 

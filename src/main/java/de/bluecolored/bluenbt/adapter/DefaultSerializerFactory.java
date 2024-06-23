@@ -37,6 +37,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
+/**
+ * A {@link TypeSerializerFactory} attempting to create {@link TypeSerializer}s for any type based on the types fields using reflection.
+ */
 public class DefaultSerializerFactory implements TypeSerializerFactory {
 
     public static final DefaultSerializerFactory INSTANCE = new DefaultSerializerFactory();

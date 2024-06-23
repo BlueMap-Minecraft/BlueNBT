@@ -29,6 +29,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * This annotation can be used on a no-args method of an object that should be deserialized.
+ * <p>Methods annotated with this will be invoked directly after deserialization, and can be used to perform any operations
+ * that need to be done to finalize the deserialization.</p>
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD})
 public @interface NBTPostDeserialize {}

@@ -33,6 +33,9 @@ import java.lang.reflect.Array;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * A {@link TypeAdapterFactory} creating {@link TypeAdapter}s for any Array-Type
+ */
 public class ArrayAdapterFactory implements TypeAdapterFactory {
 
     public static final ArrayAdapterFactory INSTANCE = new ArrayAdapterFactory();

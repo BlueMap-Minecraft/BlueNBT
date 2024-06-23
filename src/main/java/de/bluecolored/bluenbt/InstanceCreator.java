@@ -24,8 +24,15 @@
  */
 package de.bluecolored.bluenbt;
 
+/**
+ * An {@link InstanceCreator} is able to create instances of a certain type T
+ */
+@FunctionalInterface
 public interface InstanceCreator<T> {
 
+    /**
+     * Creates and returns a new instance of T
+     */
     T create();
 
 }

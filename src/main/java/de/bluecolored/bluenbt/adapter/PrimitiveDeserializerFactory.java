@@ -32,6 +32,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * A {@link TypeDeserializerFactory} creating {@link TypeDeserializer}s for any primitive type and {@link String}s
+ */
 public class PrimitiveDeserializerFactory implements TypeDeserializerFactory {
 
     public static final PrimitiveDeserializerFactory INSTANCE = new PrimitiveDeserializerFactory();
@@ -58,11 +61,7 @@ public class PrimitiveDeserializerFactory implements TypeDeserializerFactory {
     @SuppressWarnings("unchecked")
     public <T> Optional<TypeDeserializer<T>> create(TypeToken<T> typeToken, BlueNBT blueNBT) {
         TypeDeserializer<?> typeDeserializer = TYPE_DESERIALIZER_MAP.get(typeToken.getRawType());
-
-        if (typeDeserializer != null)
-            return Optional.of((TypeDeserializer<T>) typeDeserializer);
-
-        return Optional.empty();
+        return Optional.ofNullable((TypeDeserializer<T>) typeDeserializer);
     }
 
     public static boolean readBool(NBTReader reader) throws IOException {

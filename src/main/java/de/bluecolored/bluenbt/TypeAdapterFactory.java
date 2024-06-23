@@ -26,8 +26,19 @@ package de.bluecolored.bluenbt;
 
 import java.util.Optional;
 
+/**
+ * A factory for creating {@link TypeAdapter}s
+ */
+@FunctionalInterface
 public interface TypeAdapterFactory extends TypeSerializerFactory, TypeDeserializerFactory {
 
+    /**
+     * Attempts to create and return a {@link TypeAdapter} for the given type, returning an empty {@link Optional} if the type
+     * is not supported by this factory.
+     * @param type The type the new {@link TypeAdapter} should be able to (de)serialize
+     * @param blueNBT The currently used BlueNBT-instance
+     * @return An {@link Optional} with the {@link TypeAdapter} or an empty Optional if the type is not supported
+     */
     <T> Optional<? extends TypeAdapter<T>> create(TypeToken<T> type, BlueNBT blueNBT);
 
 }

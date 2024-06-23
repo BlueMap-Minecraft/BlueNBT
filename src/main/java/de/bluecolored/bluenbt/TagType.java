@@ -29,6 +29,9 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.NoSuchElementException;
 
+/**
+ * The raw NBT data-type
+ */
 @RequiredArgsConstructor
 @Getter
 public enum TagType {

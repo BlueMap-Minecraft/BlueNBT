@@ -84,3 +84,23 @@ try (
 > Both times we GZIP(De)Compressed our streams before writing/reading. This is because usually all nbt-files are
 > GZIP-Compressed, BlueNBT does **not** do this for us to allow more flexibility.  
 > Also, make sure to use buffered streams before (de)compression to greatly improve compression-performance.
+
+### Using TypeTokens
+Sometimes you have a type with generic type-variables that you want to deserialize, for example `HashMap<String, Integer>`. 
+However, you can't easily create a `Class<?>` or `Type` for such a type that you can use to call `BlueNBT#read(InputStream in, Class<T> type)`.
+This is where `TypeToken`s come in.  
+You can create a `TypeToken` in multiple ways:
+```java
+// simply from a Class<?> or Type
+TypeToken.of(String.class) // String
+
+// for an array of a certain type
+TypeToken.array(String.class) // String[]
+
+// for a raw Class<?> with additional type-parameters
+TypeToken.of(Map.class, String.class, Integer.class) // Map<String, Integer>
+
+// or by creating a generic anonymous subclass of TypeToken
+new TypeToken< Map<String, Collection<Integer>> >() {} // Map<String, Collection<Integer>>
+```
+You can then pass this `TypeToken` to e.g. `BlueNBT#read(InputStream in, TypeToken<T> type)`.

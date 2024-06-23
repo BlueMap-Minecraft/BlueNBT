@@ -24,23 +24,28 @@
  */
 package de.bluecolored.bluenbt.adapter;
 
-import de.bluecolored.bluenbt.BlueNBT;
-import de.bluecolored.bluenbt.InstanceCreator;
-import de.bluecolored.bluenbt.InstanceCreatorFactory;
-import de.bluecolored.bluenbt.TypeToken;
+import de.bluecolored.bluenbt.*;
 
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+/**
+ * A {@link InstanceCreatorFactory} attempting to create {@link InstanceCreator}s for any type trying a bunch of methods:
+ * <ul>
+ *  <li>Using the default (no-args) constructor of the type</li>
+ *  <li>Using common Collection and Map types</li>
+ *  <li>Using sun.misc.Unsafe to create an instance</li>
+ * </ul>
+ */
 public class DefaultInstanceCreatorFactory implements InstanceCreatorFactory {
 
     public static final DefaultInstanceCreatorFactory INSTANCE = new DefaultInstanceCreatorFactory();
 
     @Override
     public <T> Optional<? extends InstanceCreator<T>> create(TypeToken<T> type, BlueNBT blueNBT) {
-        return Optional.empty();
+        return Optional.of(createFor(type, blueNBT));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

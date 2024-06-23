@@ -28,13 +28,13 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.Closeable;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * Can be used to directly write raw nbt-data to any {@link OutputStream}.
+ */
 public class NBTWriter implements Closeable {
 
     private final DataOutputStream out;

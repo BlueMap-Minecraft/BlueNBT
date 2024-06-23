@@ -33,6 +33,9 @@ import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Function;
 
+/**
+ * A {@link TypeDeserializerFactory} attempting to create {@link TypeDeserializer}s for any type based on the types fields using reflection.
+ */
 public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
     public static final DefaultDeserializerFactory INSTANCE = new DefaultDeserializerFactory();

@@ -40,7 +40,6 @@ public class TypeToken<T> {
 
     private final Class<? super T> rawType;
     private final Type type;
-    private final int hashCode;
 
     /**
      * You can create any TypeToken instance by creating an anonymous subclass with type-parameters.<br>
@@ -56,7 +55,6 @@ public class TypeToken<T> {
 
         this.type = superclass.getActualTypeArguments()[0];
         this.rawType = (Class<? super T>) findRawType(type);
-        this.hashCode = type.hashCode();
     }
 
     @SuppressWarnings("unchecked")
@@ -70,7 +68,6 @@ public class TypeToken<T> {
 
         this.type = type;
         this.rawType = rawType;
-        this.hashCode = type.hashCode();
     }
 
     /**
@@ -127,6 +124,18 @@ public class TypeToken<T> {
     }
 
     @Override
+    public final boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TypeToken<?> typeToken)) return false;
+        return type.equals(typeToken.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return type.hashCode();
+    }
+
+    @Override
     public String toString() {
         return typeToString(type);
     }
@@ -146,6 +155,17 @@ public class TypeToken<T> {
     }
 
     /**
+     * Creates a new TypeToken representing the provided generic type with the specified type-arguments
+     * <blockquote><pre>
+     *  // Map<String, Object>
+     *  TypeToken.of(Map.class, String.class, Object.class)
+     * </pre></blockquote>
+     */
+    public static TypeToken<?> of(Type rawType, Type... typeArguments) {
+        return new TypeToken<>(new ParameterizedTypeImpl(null, rawType, typeArguments));
+    }
+
+    /**
      * Creates a new TypeToken representing an array with the provided component type
      * <blockquote><pre>
      *  // String[]
@@ -154,17 +174,6 @@ public class TypeToken<T> {
      */
     public static TypeToken<?> array(Type componentType) {
         return new TypeToken<>(new GenericArrayTypeImpl(componentType));
-    }
-
-    /**
-     * Creates a new TypeToken representing the provided generic type with the specified type-arguments
-     * <blockquote><pre>
-     *  // Map<String, Object>
-     *  TypeToken.parameterized(Map.class, String.class, Object.class)
-     * </pre></blockquote>
-     */
-    public static TypeToken<?> parameterized(Type rawType, Type... typeArguments) {
-        return new TypeToken<>(new ParameterizedTypeImpl(null, rawType, typeArguments));
     }
 
     @Getter
