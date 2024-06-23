@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    implementation ( "de.bluecolored.bluenbt:BlueNBT:3.0.0" )
+    implementation ( "de.bluecolored.bluenbt:BlueNBT:3.0.1" )
 }
 ```
 
@@ -31,7 +31,7 @@ dependencies {
 <dependency>
     <groupId>de.bluecolored.bluenbt</groupId>
     <artifactId>BlueNBT</artifactId>
-    <version>2.3.0</version>
+    <version>3.0.1</version>
 </dependency>
 ```
 
