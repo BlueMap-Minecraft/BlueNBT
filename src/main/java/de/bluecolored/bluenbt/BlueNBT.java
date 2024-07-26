@@ -165,7 +165,7 @@ public class BlueNBT {
     @SuppressWarnings("unchecked")
     public <T> TypeSerializer<T> getTypeSerializer(TypeToken<T> type) {
         TypeSerializer<T> serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
-        if (serializer != null) return serializer;
+        if (serializer != null && (!(serializer instanceof FutureTypeSerializer))) return serializer;
 
         synchronized (this) {
             serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
@@ -196,7 +196,7 @@ public class BlueNBT {
     @SuppressWarnings("unchecked")
     public <T> TypeDeserializer<T> getTypeDeserializer(TypeToken<T> type) {
         TypeDeserializer<T> deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
-        if (deserializer != null) return deserializer;
+        if (deserializer != null && (!(deserializer instanceof FutureTypeDeserializer))) return deserializer;
 
         synchronized (this) {
             deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
@@ -227,7 +227,7 @@ public class BlueNBT {
     @SuppressWarnings("unchecked")
     public <T> InstanceCreator<T> getInstanceCreator(TypeToken<T> type) {
         InstanceCreator<T> instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
-        if (instanceCreator != null) return instanceCreator;
+        if (instanceCreator != null && (!(instanceCreator instanceof FutureInstanceCreator))) return instanceCreator;
 
         synchronized (this) {
             instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
