@@ -1,2 +1,1 @@
-rootProject.name = "BlueNBT"
-
+rootProject.name = "bluenbt"

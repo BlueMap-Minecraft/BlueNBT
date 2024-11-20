@@ -30,7 +30,7 @@ val lastVersion = if (lastTag.isEmpty()) "dev" else lastTag.substring(1) // remo
 val commits = "git rev-list --count $lastTag..HEAD".runCommand()
 println("Git hash: $gitHash" + if (clean) "" else " (dirty)")
 
-group = "de.bluecolored.bluenbt"
+group = "de.bluecolored"
 version = lastVersion +
         (if (commits == "0") "" else "-$commits") +
         (if (clean) "" else "-dirty")
