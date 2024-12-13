@@ -39,8 +39,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class BlueNBTTest {
 
@@ -113,6 +112,29 @@ public class BlueNBTTest {
 
         BlueNBT blueNBT = new BlueNBT();
         blueNBT.setNamingStrategy(NamingStrategy.lowerCaseWithDelimiter("_"));
+        blueNBT.register(TypeToken.of(BlockState.class), new TypeResolver<BlockState, BlockState>() {
+
+            @Override
+            public TypeToken<BlockState> getBaseType() {
+                return TypeToken.of(BlockState.class);
+            }
+
+            @Override
+            public TypeToken<? extends BlockState> resolve(BlockState base) {
+                if (base.getName().equals("minecraft:sculk_vein"))
+                    return TypeToken.of(SpecialBlockState.class);
+                return TypeToken.of(BlockState.class);
+            }
+
+            @Override
+            public Iterable<TypeToken<? extends BlockState>> getPossibleTypes() {
+                return List.of(
+                        TypeToken.of(BlockState.class),
+                        TypeToken.of(SpecialBlockState.class)
+                );
+            }
+
+        });
 
         try (InputStream in = loadMcaFileChunk(0, 0)) {
             Chunk chunk = blueNBT.read(in, TypeToken.of(Chunk.class));
@@ -128,6 +150,7 @@ public class BlueNBTTest {
             assertEquals("true", blockState.getProperties().get("down"));
             assertEquals("false", blockState.getProperties().get("east"));
             assertEquals("minecraft:sculk_vein", blockState.getName());
+            assertInstanceOf(SpecialBlockState.class, blockState);
         }
 
     }
@@ -234,6 +257,8 @@ public class BlueNBTTest {
         @NBTName("Properties")
         private Map<String, String> properties = Collections.emptyMap();
     }
+
+    private static class SpecialBlockState extends BlockState {}
 
     @Data
     private static class LevelFile<T> {

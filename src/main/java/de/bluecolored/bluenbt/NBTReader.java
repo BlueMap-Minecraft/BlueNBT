@@ -39,6 +39,7 @@ import java.util.function.IntFunction;
 public class NBTReader implements Closeable {
     private static final String UNKNOWN_NAME = "<unknown>";
 
+    private final DataLogInputStream log;
     private final DataInputStream in;
 
     private int stackPosition = 0;
@@ -46,12 +47,14 @@ public class NBTReader implements Closeable {
     private String[] nameStack = new String[32];
     private int[] listStack = new int[32];
 
+    public NBTReader(byte @NotNull [] data) {
+        this(new ByteArrayInputStream(data));
+    }
+
     public NBTReader(@NotNull InputStream in) {
         Objects.requireNonNull(in);
-        if (in instanceof DataInputStream)
-            this.in = (DataInputStream) in;
-        else
-            this.in = new DataInputStream(in);
+        this.log = new DataLogInputStream(in);
+        this.in = new DataInputStream(log);
     }
 
     public TagType peek() throws IOException {
@@ -300,6 +303,25 @@ public class NBTReader implements Closeable {
         for (int i = 0; i < readLength; i++)
             Array.setLong(bufferArray, i, in.readLong());
         skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
+    }
+
+    /**
+     * Reads the entire next element and returns it as a raw nbt-data byte-array.
+     */
+    public byte[] raw() throws IOException {
+        checkState();
+        log.startLog();
+
+        // write tag-id and name back into log
+        DataOutputStream dOut = new DataOutputStream(log.log);
+        dOut.write(peek().getId());
+        dOut.writeUTF(name());
+        dOut.flush();
+
+        // skip element, writing it into the log
+        skip();
+
+        return log.stopLog();
     }
 
     /**

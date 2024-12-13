@@ -27,6 +27,7 @@ package de.bluecolored.bluenbt;
 import de.bluecolored.bluenbt.adapter.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,12 +43,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BlueNBT {
 
+    @SuppressWarnings("rawtypes")
+    private static final TypeResolver NO_TYPE_RESOLVER = new TypeResolver() {
+        @Override public TypeToken getBaseType() { throw new UnsupportedOperationException(); }
+        @Override public TypeToken resolve(Object base) { throw new UnsupportedOperationException(); }
+        @Override public Iterable getPossibleTypes() { throw new UnsupportedOperationException(); }
+    };
+
     private final List<TypeSerializerFactory> serializerFactories = new ArrayList<>();
     private final List<TypeDeserializerFactory> deserializerFactories = new ArrayList<>();
     private final List<InstanceCreatorFactory> instanceCreatorFactories = new ArrayList<>();
+    private final List<TypeResolverFactory> typeResolverFactories = new ArrayList<>();
     private final Map<TypeToken<?>, TypeSerializer<?>> typeSerializerMap = new ConcurrentHashMap<>();
     private final Map<TypeToken<?>, TypeDeserializer<?>> typeDeserializerMap = new ConcurrentHashMap<>();
     private final Map<TypeToken<?>, InstanceCreator<?>> instanceCreatorMap = new ConcurrentHashMap<>();
+    private final Map<TypeToken<?>, TypeResolver<?, ?>> typeResolverMap = new ConcurrentHashMap<>();
 
     /**
      * The {@link NamingStrategy} this BlueNBT instance uses to determine the NBT-name
@@ -97,6 +107,13 @@ public class BlueNBT {
      */
     public synchronized void register(InstanceCreatorFactory instanceCreatorFactory) {
         instanceCreatorFactories.add(instanceCreatorFactory);
+    }
+
+    /**
+     * Registers a {@link TypeResolverFactory} for this BlueNBT instance to use for resolving types.
+     */
+    public synchronized void register(TypeResolverFactory typeResolverFactory) {
+        typeResolverFactories.add(typeResolverFactory);
     }
 
     /**
@@ -154,6 +171,21 @@ public class BlueNBT {
             public <U> Optional<? extends InstanceCreator<U>> create(TypeToken<U> createType, BlueNBT blueNBT) {
                 if (createType.equals(type))
                     return Optional.of((InstanceCreator<U>) instanceCreator);
+                return Optional.empty();
+            }
+        });
+    }
+
+    /**
+     * Registers a {@link TypeResolver} for this BlueNBT instance to use for instance-creation of the specified type.
+     */
+    public <T> void register(TypeToken<T> type, TypeResolver<T, ?> typeResolver) {
+        register(new TypeResolverFactory() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <U> Optional<? extends TypeResolver<U, ?>> create(TypeToken<U> createType, BlueNBT blueNBT) {
+                if (createType.equals(type))
+                    return Optional.of((TypeResolver<U, ?>) typeResolver);
                 return Optional.empty();
             }
         });
@@ -250,6 +282,37 @@ public class BlueNBT {
         }
 
         return instanceCreator;
+    }
+
+    /**
+     * Returns the {@link InstanceCreator} for the given type or null if there is none
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T> @Nullable TypeResolver<T, ?> getTypeResolver(TypeToken<T> type) {
+        TypeResolver<T, ?> typeResolver = (TypeResolver<T, ?>) typeResolverMap.get(type);
+        if (typeResolver != null && (!(typeResolver instanceof FutureInstanceCreator))) return typeResolver;
+
+        synchronized (this) {
+            typeResolver = (TypeResolver<T, ?>) typeResolverMap.get(type);
+            if (typeResolver != null) return typeResolver;
+
+            FutureTypeResolver<T, ?> future = new FutureTypeResolver<>();
+            typeResolverMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+
+            for (int i = typeResolverFactories.size() - 1; i >= 0; i--) {
+                TypeResolverFactory factory = typeResolverFactories.get(i);
+                typeResolver = factory.create(type, this).orElse(null);
+                if (typeResolver != null) break;
+            }
+
+            if (typeResolver == null)
+                typeResolver = NO_TYPE_RESOLVER;
+
+            future.complete((TypeResolver) typeResolver);
+            typeResolverMap.put(type, typeResolver);
+        }
+
+        return typeResolver == NO_TYPE_RESOLVER ? null : typeResolver;
     }
 
     /**
@@ -433,14 +496,43 @@ public class BlueNBT {
         private InstanceCreator<T> value;
 
         public void complete(InstanceCreator<T> value) {
-            if (this.value != null) throw new IllegalStateException("FutureObjectConstructor already completed!");
+            if (this.value != null) throw new IllegalStateException("FutureInstanceCreator already completed!");
             this.value = Objects.requireNonNull(value);
         }
 
         @Override
         public T create() {
-            if (this.value == null) throw new IllegalStateException("FutureObjectConstructor is not ready!");
+            if (this.value == null) throw new IllegalStateException("FutureInstanceCreator is not ready!");
             return this.value.create();
+        }
+
+    }
+
+    private static class FutureTypeResolver<T, B> implements TypeResolver<T, B> {
+
+        private TypeResolver<T, B> value;
+
+        public void complete(TypeResolver<T, B> value) {
+            if (this.value != null) throw new IllegalStateException("FutureTypeResolver already completed!");
+            this.value = Objects.requireNonNull(value);
+        }
+
+        @Override
+        public TypeToken<B> getBaseType() {
+            if (this.value == null) throw new IllegalStateException("FutureTypeResolver is not ready!");
+            return this.value.getBaseType();
+        }
+
+        @Override
+        public TypeToken<? extends T> resolve(B base) {
+            if (this.value == null) throw new IllegalStateException("FutureTypeResolver is not ready!");
+            return this.value.resolve(base);
+        }
+
+        @Override
+        public Iterable<TypeToken<? extends T>> getPossibleTypes() {
+            if (this.value == null) throw new IllegalStateException("FutureTypeResolver is not ready!");
+            return this.value.getPossibleTypes();
         }
 
     }

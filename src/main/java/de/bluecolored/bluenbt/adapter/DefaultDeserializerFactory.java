@@ -47,10 +47,56 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
     public <T> TypeDeserializer<T> createFor(TypeToken<T> type, BlueNBT blueNBT) {
         try {
-            return new DefaultAdapter<>(type, blueNBT.getInstanceCreator(type), blueNBT);
+            TypeResolver<T, ?> typeResolver = blueNBT.getTypeResolver(type);
+            if (typeResolver != null)
+                return new TypeResolvingAdapter<>(type, typeResolver, blueNBT);
+            return new DefaultAdapter<>(type, blueNBT);
         } catch (Exception ex) {
             throw new RuntimeException("Failed to create Default-TypeSerializer for type: " + type, ex);
         }
+    }
+
+    static class TypeResolvingAdapter<T> implements TypeDeserializer<T>  {
+
+        private final TypeResolver<T, Object> typeResolver;
+        private final TypeToken<Object> baseType;
+        private final TypeDeserializer<Object> baseDeserializer;
+        private final Map<TypeToken<?>, TypeDeserializer<? extends T>> delegateDeserializers;
+        private final TypeDeserializer<T> fallbackDeserializer;
+
+        @SuppressWarnings("unchecked")
+        public TypeResolvingAdapter(TypeToken<T> type, TypeResolver<T, ?> typeResolver,  BlueNBT blueNBT) {
+            this.typeResolver = (TypeResolver<T, Object>) typeResolver;
+            this.baseType = this.typeResolver.getBaseType();
+            this.baseDeserializer = new DefaultAdapter<>(baseType, blueNBT);
+            this.delegateDeserializers = new HashMap<>();
+            for (TypeToken<? extends T> resolved : typeResolver.getPossibleTypes())
+                delegateDeserializers.put(resolved, new DefaultAdapter<>(resolved, blueNBT));
+            this.fallbackDeserializer = new DefaultAdapter<>(type, blueNBT);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public T read(NBTReader reader) throws IOException {
+            // read next element as raw data
+            byte[] data = reader.raw();
+
+            // parse data first into base object
+            Object base = baseDeserializer.read(new NBTReader(data));
+
+            // resolve type
+            TypeToken<? extends T> resolvedType = typeResolver.resolve(base);
+            TypeDeserializer<? extends T> deserializer = delegateDeserializers.get(resolvedType);
+            if (deserializer == null) deserializer = fallbackDeserializer;
+
+            // shortcut if resolved type == base type
+            if (resolvedType.equals(baseType))
+                return (T) base;
+
+            // parse data into final type
+            return deserializer.read(new NBTReader(data));
+        }
+
     }
 
     static class DefaultAdapter<T> implements TypeDeserializer<T>  {
@@ -73,9 +119,9 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
         private final Collection<PostSerializeAction<T>> postSerializeActions = new ArrayList<>(0);
 
-        public DefaultAdapter(TypeToken<T> type, InstanceCreator<T> constructor, BlueNBT blueNBT) {
+        public DefaultAdapter(TypeToken<T> type, BlueNBT blueNBT) {
             this.type = type;
-            this.constructor = constructor;
+            this.constructor = blueNBT.getInstanceCreator(type);
 
             TypeToken<?> typeToken = type;
             Class<?> raw;
@@ -132,7 +178,6 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
         @Override
         public T read(NBTReader reader) throws IOException {
-
             try {
                 T object = constructor.create();
                 reader.beginCompound();
