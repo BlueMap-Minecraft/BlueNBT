@@ -68,10 +68,16 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
         public TypeResolvingAdapter(TypeToken<T> type, TypeResolver<T, ?> typeResolver,  BlueNBT blueNBT) {
             this.typeResolver = (TypeResolver<T, Object>) typeResolver;
             this.baseType = this.typeResolver.getBaseType();
-            this.baseDeserializer = new DefaultAdapter<>(baseType, blueNBT);
+            this.baseDeserializer = baseType.equals(type) ?
+                    new DefaultAdapter<>(baseType, blueNBT) :
+                    blueNBT.getTypeDeserializer(baseType);
             this.delegateDeserializers = new HashMap<>();
-            for (TypeToken<? extends T> resolved : typeResolver.getPossibleTypes())
-                delegateDeserializers.put(resolved, new DefaultAdapter<>(resolved, blueNBT));
+            for (TypeToken<? extends T> resolved : typeResolver.getPossibleTypes()) {
+                delegateDeserializers.put(resolved, resolved.equals(type) ?
+                        new DefaultAdapter<>(resolved, blueNBT) :
+                        blueNBT.getTypeDeserializer(resolved)
+                );
+            }
             this.fallbackDeserializer = new DefaultAdapter<>(type, blueNBT);
         }
 
@@ -81,20 +87,35 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             // read next element as raw data
             byte[] data = reader.raw();
 
-            // parse data first into base object
-            Object base = baseDeserializer.read(new NBTReader(data));
+            try {
 
-            // resolve type
-            TypeToken<? extends T> resolvedType = typeResolver.resolve(base);
-            TypeDeserializer<? extends T> deserializer = delegateDeserializers.get(resolvedType);
-            if (deserializer == null) deserializer = fallbackDeserializer;
+                // parse data first into base object
+                Object base = baseDeserializer.read(new NBTReader(data));
 
-            // shortcut if resolved type == base type
-            if (resolvedType.equals(baseType))
-                return (T) base;
+                try {
 
-            // parse data into final type
-            return deserializer.read(new NBTReader(data));
+                    // resolve type
+                    TypeToken<? extends T> resolvedType = typeResolver.resolve(base);
+                    TypeDeserializer<? extends T> deserializer = delegateDeserializers.get(resolvedType);
+                    if (deserializer == null) deserializer = fallbackDeserializer;
+
+                    // shortcut if resolved type == base type
+                    if (resolvedType.equals(baseType))
+                        return (T) base;
+
+                    // parse data into final type
+                    return deserializer.read(new NBTReader(data));
+
+                } catch (IOException ex) {
+                    return typeResolver.onException(ex, base);
+                } catch (Exception ex) {
+                    return typeResolver.onException(new IOException(ex), base);
+                }
+            } catch (IOException ex) {
+                return typeResolver.onException(ex);
+            } catch (Exception ex) {
+                return typeResolver.onException(new IOException(ex));
+            }
         }
 
     }

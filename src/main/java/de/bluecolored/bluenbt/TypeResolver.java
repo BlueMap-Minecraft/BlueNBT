@@ -24,6 +24,8 @@
  */
 package de.bluecolored.bluenbt;
 
+import java.io.IOException;
+
 public interface TypeResolver<T, B> {
 
     TypeToken<B> getBaseType();
@@ -31,5 +33,24 @@ public interface TypeResolver<T, B> {
     TypeToken<? extends T> resolve(B base);
 
     Iterable<TypeToken<? extends T>> getPossibleTypes();
+
+    /**
+     * Called when the raw type data could be read fine, but parsing it against the base type threw an exception.<br>
+     * Can be used to recover from errors with some default value.<br>
+     * Defaults to just rethrowing the exception.
+     */
+    default T onException(IOException parseException) throws IOException {
+        throw parseException;
+    }
+
+    /**
+     * Called when the raw type data could be read fine, the base type could also be parsed,
+     * but parsing it against the resolved type threw an exception.<br>
+     * Can be used to recover from errors with some default value.<br>
+     * Defaults to calling {@link #onException(IOException)}
+     */
+    default T onException(IOException parseException, B base) throws IOException {
+        return onException(parseException);
+    }
 
 }
