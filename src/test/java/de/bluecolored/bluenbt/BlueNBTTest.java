@@ -74,7 +74,7 @@ public class BlueNBTTest {
 
             PlayerData playerData = blueNBT.read(new GZIPInputStream(in), PlayerData.class);
 
-            assertEquals(1, playerData.gameMode);
+            assertEquals(GameMode.CREATIVE, playerData.gameMode);
             assertEquals(-7630795211891119996L, playerData.worldUUIDLeast);
             assertEquals(-192242363273884439L, playerData.worldUUIDMost);
             assertEquals(3, playerData.position.length);
@@ -213,11 +213,18 @@ public class BlueNBTTest {
         ABC
     }
 
+    private enum GameMode {
+        SURVIVAL,
+        CREATIVE,
+        ADVENTURE,
+        SPECTATOR
+    }
+
     @SuppressWarnings({"unused", "MismatchedReadAndWriteOfArray"})
     private static class PlayerData {
 
         @NBTName("playerGameType")
-        private int gameMode;
+        private GameMode gameMode;
 
         @NBTName("Pos")
         private double[] position;

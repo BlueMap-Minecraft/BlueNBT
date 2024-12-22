@@ -75,6 +75,7 @@ public class BlueNBT {
         register(ArrayAdapterFactory.INSTANCE);
         register(PrimitiveSerializerFactory.INSTANCE);
         register(PrimitiveDeserializerFactory.INSTANCE);
+        register(EnumAdapterFactory.INSTANCE);
         register(CollectionAdapterFactory.INSTANCE);
         register(MapAdapterFactory.INSTANCE);
     }
