@@ -36,7 +36,7 @@ dependencies {
 ```
 
 ## Usage
-**[API Javadoc](https://repo.bluecolored.de/javadoc/releases/de/bluecolored/bluenbt/BlueNBT/latest)**
+**[API Javadoc](https://repo.bluecolored.de/javadoc/releases/de/bluecolored/bluenbt/latest)**
 
 The primary class to use is [`BlueNBT`](https://github.com/BlueMap-Minecraft/BlueNBT/blob/master/src/main/java/de/bluecolored/bluenbt/BlueNBT.java). 
 You can easily create yourself an instance using `new BlueNBT()`. You can configure each BlueNBT instance separately with
