@@ -204,20 +204,27 @@ public class BlueNBT {
             serializer = (TypeSerializer<T>) typeSerializerMap.get(type);
             if (serializer != null ) return serializer;
 
-            FutureTypeSerializer<T> future = new FutureTypeSerializer<>();
-            typeSerializerMap.put(type, future); // set future before creation of new serializers to avoid recursive creation
+            try {
+                FutureTypeSerializer<T> future = new FutureTypeSerializer<>();
+                typeSerializerMap.put(type, future); // set future before creation of new serializers to avoid recursive creation
 
-            for (int i = serializerFactories.size() - 1; i >= 0; i--) {
-                TypeSerializerFactory factory = serializerFactories.get(i);
-                serializer = factory.create(type, this).orElse(null);
-                if (serializer != null) break;
+                for (int i = serializerFactories.size() - 1; i >= 0; i--) {
+                    TypeSerializerFactory factory = serializerFactories.get(i);
+                    serializer = factory.create(type, this).orElse(null);
+                    if (serializer != null) break;
+                }
+
+                if (serializer == null)
+                    serializer = DefaultSerializerFactory.INSTANCE.createFor(type, this);
+
+                future.complete(serializer);
+            } finally {
+                if (serializer != null) {
+                    typeSerializerMap.put(type, serializer);
+                } else {
+                    typeSerializerMap.remove(type);
+                }
             }
-
-            if (serializer == null)
-                serializer = DefaultSerializerFactory.INSTANCE.createFor(type, this);
-
-            future.complete(serializer);
-            typeSerializerMap.put(type, serializer);
         }
 
         return serializer;
@@ -235,20 +242,27 @@ public class BlueNBT {
             deserializer = (TypeDeserializer<T>) typeDeserializerMap.get(type);
             if (deserializer != null) return deserializer;
 
-            FutureTypeDeserializer<T> future = new FutureTypeDeserializer<>();
-            typeDeserializerMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+            try {
+                FutureTypeDeserializer<T> future = new FutureTypeDeserializer<>();
+                typeDeserializerMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
-            for (int i = deserializerFactories.size() - 1; i >= 0; i--) {
-                TypeDeserializerFactory factory = deserializerFactories.get(i);
-                deserializer = factory.create(type, this).orElse(null);
-                if (deserializer != null) break;
+                for (int i = deserializerFactories.size() - 1; i >= 0; i--) {
+                    TypeDeserializerFactory factory = deserializerFactories.get(i);
+                    deserializer = factory.create(type, this).orElse(null);
+                    if (deserializer != null) break;
+                }
+
+                if (deserializer == null)
+                    deserializer = DefaultDeserializerFactory.INSTANCE.createFor(type, this);
+
+                future.complete(deserializer);
+            } finally {
+                if (deserializer != null) {
+                    typeDeserializerMap.put(type, deserializer);
+                } else {
+                    typeDeserializerMap.remove(type);
+                }
             }
-
-            if (deserializer == null)
-                deserializer = DefaultDeserializerFactory.INSTANCE.createFor(type, this);
-
-            future.complete(deserializer);
-            typeDeserializerMap.put(type, deserializer);
         }
 
         return deserializer;
@@ -266,20 +280,27 @@ public class BlueNBT {
             instanceCreator = (InstanceCreator<T>) instanceCreatorMap.get(type);
             if (instanceCreator != null) return instanceCreator;
 
-            FutureInstanceCreator<T> future = new FutureInstanceCreator<>();
-            instanceCreatorMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+            try {
+                FutureInstanceCreator<T> future = new FutureInstanceCreator<>();
+                instanceCreatorMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
-            for (int i = instanceCreatorFactories.size() - 1; i >= 0; i--) {
-                InstanceCreatorFactory factory = instanceCreatorFactories.get(i);
-                instanceCreator = factory.create(type, this).orElse(null);
-                if (instanceCreator != null) break;
+                for (int i = instanceCreatorFactories.size() - 1; i >= 0; i--) {
+                    InstanceCreatorFactory factory = instanceCreatorFactories.get(i);
+                    instanceCreator = factory.create(type, this).orElse(null);
+                    if (instanceCreator != null) break;
+                }
+
+                if (instanceCreator == null)
+                    instanceCreator = DefaultInstanceCreatorFactory.INSTANCE.createFor(type, this);
+
+                future.complete(instanceCreator);
+            } finally {
+                if (instanceCreator != null) {
+                    instanceCreatorMap.put(type, instanceCreator);
+                } else {
+                    instanceCreatorMap.remove(type);
+                }
             }
-
-            if (instanceCreator == null)
-                instanceCreator = DefaultInstanceCreatorFactory.INSTANCE.createFor(type, this);
-
-            future.complete(instanceCreator);
-            instanceCreatorMap.put(type, instanceCreator);
         }
 
         return instanceCreator;
@@ -297,20 +318,27 @@ public class BlueNBT {
             typeResolver = (TypeResolver<T, ?>) typeResolverMap.get(type);
             if (typeResolver != null) return typeResolver;
 
-            FutureTypeResolver<T, ?> future = new FutureTypeResolver<>();
-            typeResolverMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
+            try {
+                FutureTypeResolver<T, ?> future = new FutureTypeResolver<>();
+                typeResolverMap.put(type, future); // set future before creation of new deserializers to avoid recursive creation
 
-            for (int i = typeResolverFactories.size() - 1; i >= 0; i--) {
-                TypeResolverFactory factory = typeResolverFactories.get(i);
-                typeResolver = factory.create(type, this).orElse(null);
-                if (typeResolver != null) break;
+                for (int i = typeResolverFactories.size() - 1; i >= 0; i--) {
+                    TypeResolverFactory factory = typeResolverFactories.get(i);
+                    typeResolver = factory.create(type, this).orElse(null);
+                    if (typeResolver != null) break;
+                }
+
+                if (typeResolver == null)
+                    typeResolver = NO_TYPE_RESOLVER;
+
+                future.complete((TypeResolver) typeResolver);
+            } finally {
+                if (typeResolver != null) {
+                    typeResolverMap.put(type, typeResolver);
+                } else {
+                    typeResolverMap.remove(type);
+                }
             }
-
-            if (typeResolver == null)
-                typeResolver = NO_TYPE_RESOLVER;
-
-            future.complete((TypeResolver) typeResolver);
-            typeResolverMap.put(type, typeResolver);
         }
 
         return typeResolver == NO_TYPE_RESOLVER ? null : typeResolver;
