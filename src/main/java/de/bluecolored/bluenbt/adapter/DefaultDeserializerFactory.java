@@ -174,7 +174,7 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                             fields.put(name, accessor);
                         continue;
                     } else {
-                        typeDeserializer = reader -> blueNBT.read(reader, fieldType);
+                        typeDeserializer = blueNBT.getTypeDeserializer(fieldType);
                     }
 
                     FieldAccessor accessor = new TypeDeserializerFieldAccessor(field, typeDeserializer);
