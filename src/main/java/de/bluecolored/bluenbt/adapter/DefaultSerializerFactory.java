@@ -26,9 +26,11 @@ package de.bluecolored.bluenbt.adapter;
 
 import de.bluecolored.bluenbt.*;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -73,8 +75,7 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
         public DefaultAdapter(TypeToken<T> type, BlueNBT blueNBT) {
             this.type = type;
 
-            Map<Class<? extends TypeSerializer<?>>, TypeSerializer<?>> typeSerializerCache =
-                    new HashMap<>();
+            Map<Class<? extends TypeSerializer<?>>, TypeSerializer<?>> typeSerializerCache = new HashMap<>();
 
             TypeToken<?> typeToken = type;
             Class<?> raw;
@@ -95,19 +96,10 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
                     TypeSerializer<?> typeSerializer;
                     Class<? extends TypeSerializer<?>> serializerType = findSerializerType(field, fieldType.getRawType());
                     if (serializerType != null) {
-                        typeSerializer = typeSerializerCache.computeIfAbsent(serializerType, t -> {
-                            try {
-                                // try BlueNBT constructor
-                                try {
-                                    return t.getDeclaredConstructor(BlueNBT.class).newInstance(blueNBT);
-                                } catch (NoSuchMethodException ignore) {}
-
-                                // use no-args constructor
-                                return t.getDeclaredConstructor().newInstance();
-                            } catch (Exception ex) {
-                                throw new RuntimeException("Failed to create Instance of TypeSerializer!", ex);
-                            }
-                        });
+                        typeSerializer = typeSerializerCache.computeIfAbsent(
+                                serializerType,
+                                t -> createTypeSerializerInstance(t, fieldType, blueNBT)
+                        );
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldWriter accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
                         fields.put(name, accessor);
@@ -154,6 +146,41 @@ public class DefaultSerializerFactory implements TypeSerializerFactory {
             if (typeAdapter != null) return typeAdapter.value();
 
             return null;
+        }
+
+        private TypeSerializer<?> createTypeSerializerInstance(
+                Class<? extends TypeSerializer<?>> serializerType,
+                TypeToken<?> fieldType,
+                BlueNBT blueNBT
+        ) {
+            try {
+
+                // try TypeToken & BlueNBT constructor
+                try {
+                    return callConstructor(serializerType.getDeclaredConstructor(TypeToken.class, BlueNBT.class), fieldType, blueNBT);
+                } catch (NoSuchMethodException ignore) {}
+
+                // try TypeToken constructor
+                try {
+                    return callConstructor(serializerType.getDeclaredConstructor(TypeToken.class), fieldType);
+                } catch (NoSuchMethodException ignore) {}
+
+                // try BlueNBT constructor
+                try {
+                    return callConstructor(serializerType.getDeclaredConstructor(BlueNBT.class), blueNBT);
+                } catch (NoSuchMethodException ignore) {}
+
+                // use no-args constructor
+                return callConstructor(serializerType.getDeclaredConstructor());
+
+            } catch (ReflectiveOperationException ex) {
+                throw new IllegalStateException("Failed to create instance of TypeSerializer: " + serializerType, ex);
+            }
+        }
+
+        private <U> U callConstructor(Constructor<U> constructor, Object... args) throws ReflectiveOperationException {
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
         }
 
     }

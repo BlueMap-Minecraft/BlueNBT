@@ -144,6 +144,8 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
             this.type = type;
             this.constructor = blueNBT.getInstanceCreator(type);
 
+            Map<Class<? extends TypeDeserializer<?>>, TypeDeserializer<?>> typeDeserializerCache = new HashMap<>();
+
             TypeToken<?> typeToken = type;
             Class<?> raw;
             while (typeToken != null && (raw = typeToken.getRawType()) != Object.class) {
@@ -163,11 +165,10 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     TypeDeserializer<?> typeDeserializer;
                     Class<? extends TypeDeserializer<?>> deserializerType = findDeserializerType(field, fieldType.getRawType());
                     if (deserializerType != null) {
-                        try {
-                            typeDeserializer = createTypeDeserializerInstance(deserializerType, fieldType, blueNBT);
-                        } catch (Exception ex) {
-                            throw new IllegalStateException("Failed to create instance of TypeDeserializer: " + deserializerType, ex);
-                        }
+                        typeDeserializer = typeDeserializerCache.computeIfAbsent(
+                                deserializerType,
+                                t -> createTypeDeserializerInstance(t, fieldType, blueNBT)
+                        );
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldAccessor accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
                         for (String name : names)
@@ -247,24 +248,35 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                 Class<? extends TypeDeserializer<?>> deserializerType,
                 TypeToken<?> fieldType,
                 BlueNBT blueNBT
-        ) throws ReflectiveOperationException {
-            // try TypeToken & BlueNBT constructor
+        ) {
             try {
-                return deserializerType.getDeclaredConstructor(TypeToken.class, BlueNBT.class).newInstance(fieldType, blueNBT);
-            } catch (NoSuchMethodException ignore) {}
 
-            // try TypeToken constructor
-            try {
-                return deserializerType.getDeclaredConstructor(TypeToken.class).newInstance(fieldType);
-            } catch (NoSuchMethodException ignore) {}
+                // try TypeToken & BlueNBT constructor
+                try {
+                    return callConstructor(deserializerType.getDeclaredConstructor(TypeToken.class, BlueNBT.class), fieldType, blueNBT);
+                } catch (NoSuchMethodException ignore) {}
 
-            // try BlueNBT constructor
-            try {
-                return deserializerType.getDeclaredConstructor(BlueNBT.class).newInstance(blueNBT);
-            } catch (NoSuchMethodException ignore) {}
+                // try TypeToken constructor
+                try {
+                    return callConstructor(deserializerType.getDeclaredConstructor(TypeToken.class), fieldType);
+                } catch (NoSuchMethodException ignore) {}
 
-            // use no-args constructor
-            return deserializerType.getDeclaredConstructor().newInstance();
+                // try BlueNBT constructor
+                try {
+                    return callConstructor(deserializerType.getDeclaredConstructor(BlueNBT.class), blueNBT);
+                } catch (NoSuchMethodException ignore) {}
+
+                // use no-args constructor
+                return callConstructor(deserializerType.getDeclaredConstructor());
+
+            } catch (ReflectiveOperationException ex) {
+                throw new IllegalStateException("Failed to create instance of TypeDeserializer: " + deserializerType, ex);
+            }
+        }
+
+        private <U> U callConstructor(Constructor<U> constructor, Object... args) throws ReflectiveOperationException {
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
         }
 
     }
