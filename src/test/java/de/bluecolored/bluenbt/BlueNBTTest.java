@@ -53,6 +53,8 @@ public class BlueNBTTest {
             assert in != null;
 
             LevelFile<DataTag> testData = blueNBT.read(new GZIPInputStream(in), new TypeToken<>() {});
+
+            assertNotNull(testData.data);
             DataTag data = testData.data;
 
             assertEquals(1, data.getDifficulty());
@@ -61,6 +63,8 @@ public class BlueNBTTest {
             assertEquals(1687182273928L, data.getLastPlayed());
             assertEquals(0.2, data.getBorderDamagePerBlock());
             assertEquals("world", data.getLevelName());
+
+            assertNotNull(testData.dataRaw);
         }
 
     }
@@ -270,6 +274,9 @@ public class BlueNBTTest {
     @Data
     private static class LevelFile<T> {
         private T data;
+
+        @NBTName("Data")
+        private Object dataRaw;
     }
 
     @Data

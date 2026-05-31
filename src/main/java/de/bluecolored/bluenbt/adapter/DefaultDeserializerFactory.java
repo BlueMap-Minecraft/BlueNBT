@@ -136,7 +136,7 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
         private final TypeToken<T> type;
         private final InstanceCreator<T> constructor;
 
-        private final Map<String, FieldAccessor> fields = new HashMap<>();
+        private final Map<String, List<FieldAccessor>> fields = new HashMap<>();
 
         private final Collection<PostSerializeAction<T>> postSerializeActions = new ArrayList<>(0);
 
@@ -172,7 +172,7 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
                     } else if (SPECIAL_ACCESSORS.containsKey(fieldType.getType())) {
                         FieldAccessor accessor = SPECIAL_ACCESSORS.get(fieldType.getType()).apply(field);
                         for (String name : names)
-                            fields.put(name, accessor);
+                            fields.computeIfAbsent(name, k -> new ArrayList<>(1)).add(accessor);
                         continue;
                     } else {
                         typeDeserializer = blueNBT.getTypeDeserializer(fieldType);
@@ -180,7 +180,7 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
                     FieldAccessor accessor = new TypeDeserializerFieldAccessor(field, typeDeserializer);
                     for (String name : names)
-                        fields.put(name, accessor);
+                        fields.computeIfAbsent(name, k -> new ArrayList<>(1)).add(accessor);
                 }
 
                 for (Method method : raw.getDeclaredMethods()) {
@@ -206,10 +206,17 @@ public class DefaultDeserializerFactory implements TypeDeserializerFactory {
 
                 while (reader.peek() != TagType.END) {
                     String name = reader.name();
-                    FieldAccessor fieldInfo = fields.get(name);
+                    List<FieldAccessor> fieldInfos = fields.get(name);
 
-                    if (fieldInfo != null) {
-                        fieldInfo.read(object, reader);
+                    if (fieldInfos != null && !fieldInfos.isEmpty()) {
+                        if (fieldInfos.size() == 1) {
+                            fieldInfos.getFirst().read(object, reader);
+                        } else {
+                            byte[] raw = reader.raw();
+                            for (FieldAccessor fieldInfo : fieldInfos) {
+                                fieldInfo.read(object, new NBTReader(raw));
+                            }
+                        }
                     } else {
                         reader.skip();
                     }
