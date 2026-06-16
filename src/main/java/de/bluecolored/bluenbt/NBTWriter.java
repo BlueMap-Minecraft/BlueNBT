@@ -180,8 +180,10 @@ public class NBTWriter implements Closeable {
     private void tag(TagType tag) throws IOException {
         // init list if pending
         if (nextListLength != -1) {
-            if (tag != TagType.END) out.write(tag.getId());
-            else out.write(TagType.COMPOUND.getId());
+            if (tag != TagType.END)
+                out.write(tag.getId());
+            else
+                out.write(TagType.COMPOUND.getId());
             out.writeInt(nextListLength);
             stack[stackPosition] = tag;
             nextListLength = -1;
@@ -196,7 +198,9 @@ public class NBTWriter implements Closeable {
             }
             throw new IllegalStateException("Wrong tag-type. Expected type " + stack[stackPosition] + " but got " + tag);
         }
-        stack[stackPosition] = tag;
+
+        if (tag != TagType.END)
+            stack[stackPosition] = tag;
 
         out.write(tag.getId());
 

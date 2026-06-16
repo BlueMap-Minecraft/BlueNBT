@@ -67,6 +67,22 @@ public class NBTWriterTest {
         writer.value(1d);
         writer.endList(); // testList
 
+        writer.name("compoundList").beginList(2);
+
+        writer.beginCompound();
+        writer.endCompound();
+
+        writer.beginCompound();
+        assertTrue(writer.inCompound());
+        assertFalse(writer.inList());
+        writer.name("listInList").beginList(1);
+        writer.beginCompound();
+        writer.endCompound();
+        writer.endList(); // listInList
+        writer.endCompound();
+
+        writer.endList(); // compoundList
+
         writer.name("testByteArray").value(new byte[]{0, 110, 30, 20, 3, -4});
         writer.name("testIntArray").value(new int[]{0, -10342, 30, 20, 3, -4});
         writer.name("testLongArray").value(new long[]{0, 110, 289374678734L, 20, 3, -4});
@@ -123,6 +139,28 @@ public class NBTWriterTest {
         assertEquals(0.43d, reader.nextDouble());
         assertEquals(-0.43d, reader.nextDouble());
         assertEquals(1d, reader.nextDouble());
+
+        assertEquals(TagType.END, reader.peek());
+        reader.endList();
+
+        assertEquals(TagType.LIST, reader.peek());
+        assertEquals("compoundList", reader.name());
+        assertEquals(2, reader.beginList());
+
+        assertEquals(TagType.COMPOUND, reader.peek());
+        reader.beginCompound();
+        reader.endCompound();
+
+        assertEquals(TagType.COMPOUND, reader.peek());
+        reader.beginCompound();
+        assertEquals(TagType.LIST, reader.peek());
+        assertEquals("listInList", reader.name());
+        assertEquals(1, reader.beginList());
+        assertEquals(TagType.COMPOUND, reader.peek());
+        reader.beginCompound();
+        reader.endCompound();
+        reader.endList();
+        reader.endCompound();
 
         assertEquals(TagType.END, reader.peek());
         reader.endList();
