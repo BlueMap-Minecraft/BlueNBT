@@ -28,7 +28,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Array;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.IntFunction;
@@ -46,6 +49,8 @@ public class NBTReader implements Closeable {
     private TagType[] stack = new TagType[32];
     private String[] nameStack = new String[32];
     private int[] listStack = new int[32];
+
+    private @Nullable ArrayBuffer buffer;
 
     public NBTReader(byte @NotNull [] data) {
         this(new ByteArrayInputStream(data));
@@ -93,16 +98,17 @@ public class NBTReader implements Closeable {
 
     public int beginList() throws IOException {
         checkState(TagType.LIST);
-        advanceStack();
 
         TagType listType = readTag();
-        int listLength = in.readInt();
+        int length = in.readInt();
+        if (length < 0) length = 0;
 
-        stack[stackPosition] = listLength == 0 ? TagType.END : listType;
-        listStack[stackPosition] = listLength;
+        advanceStack();
+        stack[stackPosition] = length == 0 ? TagType.END : listType;
+        listStack[stackPosition] = length;
         nameStack[stackPosition] = UNKNOWN_NAME;
 
-        return listLength;
+        return length;
     }
 
     public void endList() throws IOException {
@@ -160,59 +166,58 @@ public class NBTReader implements Closeable {
 
     public byte[] nextByteArray() throws IOException {
         checkState(TagType.BYTE_ARRAY);
-        next();
-        byte[] data = new byte[in.readInt()];
+        int length = readArrayLength();
+        byte[] data = new byte[length];
         in.readFully(data);
+        next();
         return data;
     }
 
-    public int nextByteArray(byte[] buffer) throws IOException {
+    public int nextByteArray(byte[] target) throws IOException {
         checkState(TagType.BYTE_ARRAY);
+        int length = readArrayLength();
+        int readLength = Math.min(length, target.length);
+        in.readFully(target, 0, readLength);
+        in.skipNBytes(length - readLength);
         next();
-        int length = in.readInt();
-        int readLength = Math.min(length, buffer.length);
-        in.readFully(buffer, 0, readLength);
-        skipNBytes(length - readLength);
         return length;
     }
 
     public int[] nextIntArray() throws IOException {
         checkState(TagType.INT_ARRAY);
+        int length = readArrayLength();
+        int[] data = new int[length];
+        readInts(data, data.length);
         next();
-        int[] data = new int[in.readInt()];
-        for (int i = 0; i < data.length; i++)
-            data[i] = in.readInt();
         return data;
     }
 
-    public int nextIntArray(int[] buffer) throws IOException {
+    public int nextIntArray(int[] target) throws IOException {
         checkState(TagType.INT_ARRAY);
+        int length = readArrayLength();
+        int readLength = Math.min(length, target.length);
+        readInts(target, readLength);
+        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
         next();
-        int length = in.readInt();
-        int readLength = Math.min(length, buffer.length);
-        for (int i = 0; i < readLength; i++)
-            buffer[i] = in.readInt();
-        skipNBytes((long) (length - readLength) * TagType.INT.getSize());
         return length;
     }
 
     public long[] nextLongArray() throws IOException {
         checkState(TagType.LONG_ARRAY);
+        int length = readArrayLength();
+        long[] data = new long[length];
+        readLongs(data, data.length);
         next();
-        long[] data = new long[in.readInt()];
-        for (int i = 0; i < data.length; i++)
-            data[i] = in.readLong();
         return data;
     }
 
-    public int nextLongArray(long[] buffer) throws IOException {
+    public int nextLongArray(long[] target) throws IOException {
         checkState(TagType.LONG_ARRAY);
+        int length = readArrayLength();
+        int readLength = Math.min(length, target.length);
+        readLongs(target, readLength);
+        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
         next();
-        int length = in.readInt();
-        int readLength = Math.min(length, buffer.length);
-        for (int i = 0; i < readLength; i++)
-            buffer[i] = in.readLong();
-        skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
         return length;
     }
 
@@ -250,12 +255,12 @@ public class NBTReader implements Closeable {
     public int nextArray(Object bufferArray) throws IOException {
         checkState();
         TagType type = peek();
-        int length = in.readInt();
+        if (!isArrayType(type)) throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
+        int length = readArrayLength();
         switch (type) {
             case BYTE_ARRAY: readByteArray(length, bufferArray); break;
             case INT_ARRAY: readIntArray(length, bufferArray); break;
             case LONG_ARRAY: readLongArray(length, bufferArray); break;
-            default: throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
         }
         next();
         return length;
@@ -269,40 +274,67 @@ public class NBTReader implements Closeable {
     public <A> A nextArray(IntFunction<A> generator) throws IOException {
         checkState();
         TagType type = peek();
-        int length = in.readInt();
+        if (!isArrayType(type)) throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
+        int length = readArrayLength();
         A bufferArray = generator.apply(length);
         switch (type) {
             case BYTE_ARRAY: readByteArray(length, bufferArray); break;
             case INT_ARRAY: readIntArray(length, bufferArray); break;
             case LONG_ARRAY: readLongArray(length, bufferArray); break;
-            default: throw new IllegalStateException("Expected any array-type but got " + peek() + ". At: " + path());
         }
         next();
         return bufferArray;
     }
 
+    private int readArrayLength() throws IOException {
+        int length = in.readInt();
+        if (length < 0) throw new IOException("Invalid array-length: " + length + ". At: " + path());
+        return length;
+    }
+
     private void readByteArray(int length, Object bufferArray) throws IOException {
         checkState(TagType.BYTE_ARRAY);
         int readLength = Math.min(length, Array.getLength(bufferArray));
-        for (int i = 0; i < readLength; i++)
-            Array.setByte(bufferArray, i, in.readByte());
-        skipNBytes(length - readLength);
+        switch (bufferArray) {
+            case byte  [] a -> in.readFully(a, 0, readLength);
+            case short [] a -> readBulk(a, readLength, Byte.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = buffer.array[i]; });
+            case int   [] a -> readBulk(a, readLength, Byte.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = buffer.array[i]; });
+            case long  [] a -> readBulk(a, readLength, Byte.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = buffer.array[i]; });
+            case float [] a -> readBulk(a, readLength, Byte.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = buffer.array[i]; });
+            case double[] a -> readBulk(a, readLength, Byte.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = buffer.array[i]; });
+            default -> throw new IllegalArgumentException("Unsupported array type: " + bufferArray.getClass().getSimpleName());
+        }
+        in.skipNBytes(length - readLength);
     }
 
     private void readIntArray(int length, Object bufferArray) throws IOException {
         checkState(TagType.INT_ARRAY);
         int readLength = Math.min(length, Array.getLength(bufferArray));
-        for (int i = 0; i < readLength; i++)
-            Array.setInt(bufferArray, i, in.readInt());
-        skipNBytes((long) (length - readLength) * TagType.INT.getSize());
+        switch (bufferArray) {
+            case byte  [] a -> readBulk(a, readLength, Integer.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = (byte) readAsIntArray(buffer.array, i); });
+            case short [] a -> readBulk(a, readLength, Integer.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = (short) readAsIntArray(buffer.array, i); });
+            case int   [] a -> readInts(a, readLength);
+            case long  [] a -> readBulk(a, readLength, Integer.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = readAsIntArray(buffer.array, i); });
+            case float [] a -> readBulk(a, readLength, Integer.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = readAsIntArray(buffer.array, i); });
+            case double[] a -> readBulk(a, readLength, Integer.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = readAsIntArray(buffer.array, i); });
+            default -> throw new IllegalArgumentException("Unsupported array type: " + bufferArray.getClass().getSimpleName());
+        }
+        in.skipNBytes((long) (length - readLength) * TagType.INT.getSize());
     }
 
     private void readLongArray(int length, Object bufferArray) throws IOException {
         checkState(TagType.LONG_ARRAY);
         int readLength = Math.min(length, Array.getLength(bufferArray));
-        for (int i = 0; i < readLength; i++)
-            Array.setLong(bufferArray, i, in.readLong());
-        skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
+        switch (bufferArray) {
+            case byte  [] a -> readBulk(a, readLength, Long.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = (byte) readAsLongArray(buffer.array, i); });
+            case short [] a -> readBulk(a, readLength, Long.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = (short) readAsLongArray(buffer.array, i); });
+            case int   [] a -> readBulk(a, readLength, Long.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = (int) readAsLongArray(buffer.array, i); });
+            case long  [] a -> readLongs(a, readLength);
+            case float [] a -> readBulk(a, readLength, Long.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = readAsLongArray(buffer.array, i); });
+            case double[] a -> readBulk(a, readLength, Long.BYTES, (buffer, target, offs, len) -> { for (int i = 0; i < len; i++) target[offs + i] = readAsLongArray(buffer.array, i); });
+            default -> throw new IllegalArgumentException("Unsupported array type: " + bufferArray.getClass().getSimpleName());
+        }
+        in.skipNBytes((long) (length - readLength) * TagType.LONG.getSize());
     }
 
     /**
@@ -358,7 +390,7 @@ public class NBTReader implements Closeable {
                 case FLOAT:
                 case DOUBLE: {
                     checkState();
-                    skipNBytes(type.getSize());
+                    in.skipNBytes(type.getSize());
                     next();
                     break;
                 }
@@ -372,24 +404,24 @@ public class NBTReader implements Closeable {
 
                 case BYTE_ARRAY: {
                     checkState();
-                    long length = in.readInt();
-                    skipNBytes(TagType.BYTE.getSize() * length);
+                    long length = readArrayLength();
+                    in.skipNBytes(TagType.BYTE.getSize() * length);
                     next();
                     break;
                 }
 
                 case INT_ARRAY: {
                     checkState();
-                    long length = in.readInt();
-                    skipNBytes(TagType.INT.getSize() * length);
+                    long length = readArrayLength();
+                    in.skipNBytes(TagType.INT.getSize() * length);
                     next();
                     break;
                 }
 
                 case LONG_ARRAY: {
                     checkState();
-                    long length = in.readInt();
-                    skipNBytes(TagType.LONG.getSize() * length);
+                    long length = readArrayLength();
+                    in.skipNBytes(TagType.LONG.getSize() * length);
                     next();
                     break;
                 }
@@ -402,12 +434,13 @@ public class NBTReader implements Closeable {
 
                 case LIST: {
                     int length = beginList();
+                    if (length < 0) length = 0;
                     TagType listType = peek();
                     out++;
 
                     // fast skip list if type size is known
                     if (listType.getSize() != -1) {
-                        in.skipBytes(listType.getSize() * length);
+                        in.skipNBytes((long) listType.getSize() * length);
                         listStack[stackPosition] = 0;
                         stack[stackPosition] = TagType.END;
                     }
@@ -491,30 +524,7 @@ public class NBTReader implements Closeable {
 
     private void skipUTF() throws IOException {
         int length = in.readUnsignedShort();
-        skipNBytes(length);
-    }
-
-    /**
-     * This method is taken here from a newer version of DataInputStream,
-     * to ensure Java 11 compatibility.
-     */
-    private void skipNBytes(long n) throws IOException {
-        while (n > 0) {
-            long ns = in.skip(n);
-            if (ns > 0 && ns <= n) {
-                // adjust number to skip
-                n -= ns;
-            } else if (ns == 0) { // no bytes skipped
-                // read one byte to check for EOS
-                if (in.read() == -1) {
-                    throw new EOFException();
-                }
-                // one byte read so decrement number to skip
-                n--;
-            } else { // skipped negative or too many bytes
-                throw new IOException("Unable to skip exactly");
-            }
-        }
+        in.skipNBytes(length);
     }
 
     private void checkState() throws IOException {
@@ -533,9 +543,58 @@ public class NBTReader implements Closeable {
         }
     }
 
+    private void readInts(int[] target, int length) throws IOException {
+        readBulk(target, length, Integer.BYTES, (buffer, t, offs, len) -> buffer.ints.get(0, t, offs, len));
+    }
+
+    private void readLongs(long[] target, int length) throws IOException {
+        readBulk(target, length, Long.BYTES, (buffer, t, offs, len) -> buffer.longs.get(0, t, offs, len));
+    }
+
+    private <T> void readBulk(T target, int length, int elementSize, BufferAction<T> transfer) throws IOException {
+        if (length <= 0) return;
+
+        ArrayBuffer buffer = buffer();
+        int read = 0;
+        int bufferLength = Math.floorDiv(ArrayBuffer.CAPACITY, elementSize);
+
+        while (read < length) {
+            int readLength = Math.min(length - read, bufferLength);
+            in.readFully(buffer.array, 0, readLength * elementSize);
+            transfer.perform(buffer, target, read, readLength);
+            read += readLength;
+        }
+    }
+
+    private static boolean isArrayType(TagType type) {
+        return  type == TagType.BYTE_ARRAY ||
+                type == TagType.INT_ARRAY ||
+                type == TagType.LONG_ARRAY;
+    }
+
+    private static final VarHandle BYTE_TO_INT_ARRAY = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
+    private static final VarHandle BYTE_TO_LONG_ARRAY = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.BIG_ENDIAN);
+
+    private static int readAsIntArray(byte[] buffer, int index) {
+        return (int) BYTE_TO_INT_ARRAY.get(buffer, index << 2);
+    }
+
+    private static long readAsLongArray(byte[] buffer, int index) {
+        return (long) BYTE_TO_LONG_ARRAY.get(buffer, index << 3);
+    }
+
     @Override
     public void close() throws IOException {
         in.close();
+    }
+
+    private ArrayBuffer buffer() {
+        if (buffer == null) buffer = new ArrayBuffer();
+        return buffer;
+    }
+
+    private interface BufferAction<T> {
+        void perform(ArrayBuffer buffer, T target, int offset, int length) throws IOException;
     }
 
 }

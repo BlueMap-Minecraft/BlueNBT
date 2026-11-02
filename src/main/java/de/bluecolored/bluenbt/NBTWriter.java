@@ -28,7 +28,10 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -43,6 +46,8 @@ public class NBTWriter implements Closeable {
     private TagType[] stack = new TagType[32];
     @Nullable private String nextName = null;
     private int nextListLength = -1;
+
+    private @Nullable ArrayBuffer buffer;
 
     public NBTWriter(@NotNull OutputStream out) {
         Objects.requireNonNull(out);
@@ -136,10 +141,13 @@ public class NBTWriter implements Closeable {
         value(value, 0, value.length);
     }
 
-    public void value(byte[] value, int off, int len) throws IOException {
+    public void value(byte[] value, int off, int length) throws IOException {
+        Objects.checkFromIndexSize(off, length, value.length);
+
         tag(TagType.BYTE_ARRAY);
-        out.writeInt(value.length);
-        out.write(value, off, len);
+        out.writeInt(length);
+        out.write(value, off, length);
+
         afterValue();
     }
 
@@ -147,12 +155,23 @@ public class NBTWriter implements Closeable {
         value(value, 0, value.length);
     }
 
-    public void value(int[] value, int off, int len) throws IOException {
+    public void value(int[] value, int off, int length) throws IOException {
+        Objects.checkFromIndexSize(off, length, value.length);
+
         tag(TagType.INT_ARRAY);
-        out.writeInt(value.length);
-        int lim = off + len;
-        for (int i = off; i < lim; i++)
-            out.writeInt(value[i]);
+        out.writeInt(length);
+
+        ArrayBuffer buffer = buffer();
+        int write = 0;
+        int bufferLength = Math.floorDiv(ArrayBuffer.CAPACITY, Integer.BYTES);
+        while (write < length) {
+            int writeLength = Math.min(length - write, bufferLength);
+            buffer.ints.clear();
+            buffer.ints.put(value, off + write, writeLength);
+            out.write(buffer.array, 0, writeLength * Integer.BYTES);
+            write += writeLength;
+        }
+
         afterValue();
     }
 
@@ -160,12 +179,23 @@ public class NBTWriter implements Closeable {
         value(value, 0, value.length);
     }
 
-    public void value(long[] value, int off, int len) throws IOException {
+    public void value(long[] value, int off, int length) throws IOException {
+        Objects.checkFromIndexSize(off, length, value.length);
+
         tag(TagType.LONG_ARRAY);
-        out.writeInt(value.length);
-        int lim = off + len;
-        for (int i = off; i < lim; i++)
-            out.writeLong(value[i]);
+        out.writeInt(length);
+
+        ArrayBuffer buffer = buffer();
+        int write = 0;
+        int bufferLength = Math.floorDiv(ArrayBuffer.CAPACITY, Long.BYTES);
+        while (write < length) {
+            int writeLength = Math.min(length - write, bufferLength);
+            buffer.longs.clear();
+            buffer.longs.put(value, off + write, writeLength);
+            out.write(buffer.array, 0, writeLength * Long.BYTES);
+            write += writeLength;
+        }
+
         afterValue();
     }
 
@@ -247,6 +277,11 @@ public class NBTWriter implements Closeable {
 
         if (stackPosition > 0)
             throw new IOException("Incomplete document!");
+    }
+
+    private ArrayBuffer buffer() {
+        if (buffer == null) buffer = new ArrayBuffer();
+        return buffer;
     }
 
 }
