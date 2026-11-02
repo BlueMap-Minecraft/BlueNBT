@@ -87,6 +87,7 @@ public class BlueNBT {
         serializerFactories.add(typeAdapterFactory);
         deserializerFactories.add(typeAdapterFactory);
         typeSerializerMap.clear();
+        typeDeserializerMap.clear();
     }
 
     /**
@@ -312,11 +313,13 @@ public class BlueNBT {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <T> @Nullable TypeResolver<T, ?> getTypeResolver(TypeToken<T> type) {
         TypeResolver<T, ?> typeResolver = (TypeResolver<T, ?>) typeResolverMap.get(type);
-        if (typeResolver != null && (!(typeResolver instanceof FutureInstanceCreator))) return typeResolver;
+        if (typeResolver != null && (!(typeResolver instanceof FutureTypeResolver)))
+            return typeResolver == NO_TYPE_RESOLVER ? null : typeResolver;
 
         synchronized (this) {
             typeResolver = (TypeResolver<T, ?>) typeResolverMap.get(type);
-            if (typeResolver != null) return typeResolver;
+            if (typeResolver != null)
+                return typeResolver == NO_TYPE_RESOLVER ? null : typeResolver;
 
             try {
                 FutureTypeResolver<T, ?> future = new FutureTypeResolver<>();

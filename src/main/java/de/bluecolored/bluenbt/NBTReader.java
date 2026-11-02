@@ -341,13 +341,15 @@ public class NBTReader implements Closeable {
      * Reads the entire next element and returns it as a raw nbt-data byte-array.
      */
     public byte[] raw() throws IOException {
-        checkState();
+        TagType type = peek();
+        String name = name();
+
         log.startLog();
 
         // write tag-id and name back into log
         DataOutputStream dOut = new DataOutputStream(log.log);
-        dOut.write(peek().getId());
-        dOut.writeUTF(name());
+        dOut.write(type.getId());
+        dOut.writeUTF(name);
         dOut.flush();
 
         // skip element, writing it into the log
@@ -465,7 +467,9 @@ public class NBTReader implements Closeable {
     }
 
     public String path() throws IOException {
-        checkState();
+        // ensure the name is read
+        name();
+
         StringBuilder sb = new StringBuilder();
 
         // start with 1 since the 0th element is always the root-compound
